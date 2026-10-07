@@ -11,15 +11,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { COLORS } from '../constants/colors';
 
-const COLORS = {
-  bg: '#16181D',
-  surface: '#22252C',
-  pink: '#F0508A',
-  text: '#FFFFFF',
-  muted: '#9AA0AA',
-  icon: '#C9CDD4',
-} as const;
 
 type EventItem = {
   id: string;
