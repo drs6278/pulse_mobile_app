@@ -7,7 +7,7 @@ import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { PulseColors } from '@/constants/pulse-theme';
-import { AuthProvider } from '@/providers/auth-provider';
+import { AuthProvider, useAuth } from '@/providers/auth-provider';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -17,14 +17,30 @@ export default function RootLayout() {
     'Montserrat-SemiBold': require('@/assets/fonts/Montserrat-SemiBold.ttf'),
     'Montserrat-Black': require('@/assets/fonts/Montserrat-Black.ttf'),
   });
-  useEffect(() => {
-    if (loaded || error) void SplashScreen.hideAsync();
-  }, [loaded, error]);
-  if (!loaded && !error) return <View style={{ flex: 1, backgroundColor: PulseColors.background }} />;
   return <AuthProvider>
     <SafeAreaProvider>
       <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: PulseColors.background }, animation: 'none' }} />
+      <RootNavigator fontsReady={loaded || !!error} />
     </SafeAreaProvider>
   </AuthProvider>;
+}
+
+// Lives inside AuthProvider so it can read the session. Keeps the splash up
+// until both fonts and the stored session have loaded, so signed-in users
+// never see a flash of the login screen.
+function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
+  const { session, isLoading } = useAuth();
+  const ready = fontsReady && !isLoading;
+  useEffect(() => {
+    if (ready) void SplashScreen.hideAsync();
+  }, [ready]);
+  if (!ready) return <View style={{ flex: 1, backgroundColor: PulseColors.background }} />;
+  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: PulseColors.background }, animation: 'none' }}>
+    <Stack.Protected guard={!!session}>
+      <Stack.Screen name="(app)" />
+    </Stack.Protected>
+    <Stack.Protected guard={!session}>
+      <Stack.Screen name="login" />
+    </Stack.Protected>
+  </Stack>;
 }

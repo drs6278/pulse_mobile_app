@@ -226,6 +226,7 @@ const previews = [
   ['/', 'Home Dashboard'], ['/categories', 'Browse Categories'], ['/filters', 'Filter & Sort'],
   ['/search', 'Search Results'], ['/saved', 'Saved Events'], ['/event', 'Event Details'],
   ['/create', 'Create Event'], ['/import-schedule', 'Import Schedule'], ['/map', 'Map'], ['/calendar', 'Calendar'],
+  ['/settings', 'Settings'],
 ] as const;
 
 export function ScreensIndex() {
