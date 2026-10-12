@@ -7,6 +7,7 @@ import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { PulseColors } from '@/constants/pulse-theme';
+import { AuthProvider } from '@/providers/auth-provider';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -20,8 +21,10 @@ export default function RootLayout() {
     if (loaded || error) void SplashScreen.hideAsync();
   }, [loaded, error]);
   if (!loaded && !error) return <View style={{ flex: 1, backgroundColor: PulseColors.background }} />;
-  return <SafeAreaProvider>
-    <StatusBar style="light" />
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: PulseColors.background }, animation: 'none' }} />
-  </SafeAreaProvider>;
+  return <AuthProvider>
+    <SafeAreaProvider>
+      <StatusBar style="light" />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: PulseColors.background }, animation: 'none' }} />
+    </SafeAreaProvider>
+  </AuthProvider>;
 }
