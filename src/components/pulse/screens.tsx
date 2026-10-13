@@ -1,34 +1,19 @@
 import { Image } from 'expo-image';
-import { Text, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PulseColors as C, PulseImages as Images } from '@/constants/pulse-theme';
+import { eventCategories } from '@/lib/event-filters';
+import { useEvents } from '@/providers/events-provider';
+import { EventFeed, EventFiltersScreen, SupabaseEventScreen } from './event-browser';
 import {
   EventRow, Photo, PreviewLink, PulseIcon, PulseText, Screen,
   SearchHeader, Tag, TitleHeader, usePulseScale,
 } from './ui';
 
 export function HomeScreen() {
-  return <Screen header={<SearchHeader home />} bottomBar activeTab="home"><HomeContent /></Screen>;
-}
-
-function HomeContent() {
-  const s = usePulseScale();
-  return <View style={{ paddingHorizontal: 12 * s, paddingTop: 18 * s, gap: 18 * s }}>
-    {[
-      { title: 'Concert', tag: 'Music', time: '9:00pm est', image: Images.concert, saved: false },
-      { title: 'Food Truck', tag: 'Food', time: '4:00pm est', image: Images.foodTruck, saved: true },
-    ].map(event => <View key={event.title}>
-      <Photo source={event.image} height={200}>
-        <View style={{ position: 'absolute', top: 12 * s, left: 12 * s }}><Tag label={event.tag} href="/categories" /></View>
-        <PreviewLink href="/event" label={`Preview ${event.title}`} style={{ position: 'absolute', left: 13 * s, right: 65 * s, bottom: 6 * s }}>
-          <PulseText font="black" size={24} lineHeight={32}>{event.title}</PulseText>
-          <PulseText font="regular" size={16} lineHeight={23}>{event.time}</PulseText>
-        </PreviewLink>
-        <View accessibilityLabel={event.saved ? 'Saved event' : 'Unsaved event'} style={{ position: 'absolute', right: 7 * s, bottom: 7 * s }}><PulseIcon name={event.saved ? 'bookmarkFilled' : 'bookmark'} size={40} color={event.saved ? C.pink : C.muted} /></View>
-      </Photo>
-    </View>)}
-  </View>;
+  return <Screen header={<SearchHeader home />} bottomBar activeTab="home"><EventFeed /></Screen>;
 }
 
 export function CategoriesScreen() {
@@ -37,50 +22,18 @@ export function CategoriesScreen() {
 
 function CategoriesContent() {
   const s = usePulseScale();
+  const { filters, applyFilters } = useEvents();
   return <View style={{ paddingLeft: 18 * s, paddingRight: 14 * s, paddingTop: 12 * s, flexDirection: 'row', flexWrap: 'wrap', columnGap: 20 * s, rowGap: 25 * s }}>
-    {['Music', 'Food', 'Sports', 'Art', 'Outdoors', 'Other'].map(category => <PreviewLink key={category} href="/search" label={`Preview ${category} category`}>
+    {eventCategories.map(category => <Pressable key={category} accessibilityRole="button" accessibilityLabel={`Browse ${category} events`} onPress={() => { applyFilters({ ...filters, categories: [category] }); router.navigate('/search'); }}>
       <Photo source={Images.categories} width={175} height={175}><View style={{ position: 'absolute', left: 7 * s, bottom: 7 * s }}><PulseText font="black" size={24} lineHeight={32}>{category}</PulseText></View></Photo>
-    </PreviewLink>)}
+    </Pressable>)}
   </View>;
 }
 
-export function FiltersScreen() {
-  return <Screen header={<TitleHeader title="Filter & sort" close right={<PulseText size={24} color={C.pink}>Reset</PulseText>} />} action="Show Results" actionHref="/search"><FiltersContent /></Screen>;
-}
-
-function FilterGroup({ title, options }: { title: string; options: string[] }) {
-  const s = usePulseScale();
-  return <View>
-    <PulseText size={32} color={C.white} lineHeight={40}>{title}</PulseText>
-    <View style={{ marginTop: 12 * s, flexDirection: 'row', flexWrap: 'wrap', columnGap: 18 * s, rowGap: 18 * s }}>
-      {options.map((label, index) => <View key={label} accessibilityLabel={`${label}${index === 0 ? ', selected' : ''}`} style={{ width: 80 * s, height: 45 * s, borderRadius: 25 * s, borderWidth: index === 0 ? 0 : 3 * s, borderColor: C.muted, backgroundColor: index === 0 ? C.pink : 'transparent', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}><Text numberOfLines={1} ellipsizeMode="clip" style={{ fontSize: 14 * s, fontWeight: '500', color: index === 0 ? C.white : C.muted }}>{label}</Text></View>)}
-    </View>
-  </View>;
-}
-
-function FiltersContent() {
-  const s = usePulseScale();
-  return <View style={{ paddingHorizontal: 11 * s, paddingTop: 17 * s }}>
-    <FilterGroup title="Category" options={['All', 'Food', 'Music', 'Sports', 'Arts']} />
-    <View style={{ marginTop: 41 * s }}><FilterGroup title="Date" options={['Today', 'Tomorrow', 'This Week', 'This Weekend', 'Pick Date']} /></View>
-    <View style={{ marginTop: 41 * s }}><FilterGroup title="Distance" options={['1 mi', '5 mi', '10 mi', 'Pick Dist.']} /></View>
-  </View>;
-}
+export const FiltersScreen = EventFiltersScreen;
 
 export function SearchScreen() {
-  return <Screen header={<SearchHeader query="food trucks" />} bottomBar activeTab="home"><SearchContent /></Screen>;
-}
-
-function SearchContent() {
-  const s = usePulseScale();
-  return <View style={{ paddingHorizontal: 14 * s, paddingTop: 35 * s }}>
-    <PulseText size={16} font="black" lineHeight={25}>Results for “food trucks”</PulseText>
-    <PulseText size={12} font="black" lineHeight={24}>2 events found</PulseText>
-    <View style={{ marginTop: 17 * s }}>
-      <EventRow title="Food" image={Images.search} arrow />
-      <EventRow title="Food" image={Images.search} arrow />
-    </View>
-  </View>;
+  return <Screen header={<SearchHeader />} bottomBar activeTab="home"><EventFeed /></Screen>;
 }
 
 export function SavedScreen() {
@@ -114,6 +67,9 @@ function EventInfo({ map = false }: { map?: boolean }) {
 }
 
 export function EventScreen() {
+  const { id } = useLocalSearchParams<{ id?: string | string[] }>();
+  const eventId = Array.isArray(id) ? id[0] : id;
+  if (eventId) return <SupabaseEventScreen id={eventId} />;
   return <Screen header={<TitleHeader title="Pick up Basketball" right={<PulseIcon name="bookmarkFilled" color={C.pink} />} />} action="RSVP"><EventContent /></Screen>;
 }
 
@@ -236,7 +192,7 @@ export function ScreensIndex() {
 function PreviewContent() {
   const s = usePulseScale();
   return <View style={{ padding: 20 * s, gap: 12 * s }}>
-    <PulseText font="regular" color={C.muted} style={{ marginBottom: 8 * s }}>Pulse designs with navigation only. Event actions and fields are static.</PulseText>
+    <PulseText font="regular" color={C.muted} style={{ marginBottom: 8 * s }}>Event browsing and filters use Supabase. Other event actions and fields are previews.</PulseText>
     {previews.map(([href, label]) => <PreviewLink key={href} href={href} label={label} style={{ backgroundColor: C.surface, padding: 16 * s, borderRadius: 14 * s, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><PulseText size={18}>{label}</PulseText><PulseIcon name="next" size={24} color={C.pink} /></PreviewLink>)}
   </View>;
 }

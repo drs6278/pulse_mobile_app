@@ -118,13 +118,14 @@ function ActionFace({ label }: { label: string }) {
   return <View style={{ width: 300 * s, height: 75 * s, borderRadius: 25 * s, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' }}><PulseText size={32} color={C.white}>{label}</PulseText></View>;
 }
 
-export function Screen({ children, header, activeTab, bottomBar = false, action, actionHref, overlay }: {
+export function Screen({ children, header, activeTab, bottomBar = false, action, actionHref, onAction, overlay }: {
   children: ReactNode;
   header: ReactNode;
   activeTab?: 'home' | 'saved' | 'create';
   bottomBar?: boolean;
   action?: string;
   actionHref?: Href;
+  onAction?: () => void;
   overlay?: ReactNode;
 }) {
   const { width } = useWindowDimensions();
@@ -133,11 +134,11 @@ export function Screen({ children, header, activeTab, bottomBar = false, action,
   const s = Math.min(hydrated && width > 0 ? width : 402, 402) / 402;
   return <ScaleContext.Provider value={s}><View style={styles.backdrop}><SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { maxWidth: 402 }]}>
     {header}
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, minHeight: (874 - 75 - (bottomBar ? 75 : action ? 105 : 0)) * s }} showsVerticalScrollIndicator={false}>
+    <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, minHeight: (874 - 75 - (bottomBar ? 75 : action ? 105 : 0)) * s }} showsVerticalScrollIndicator={false}>
       {children}
     </ScrollView>
     {bottomBar && <BottomBar active={activeTab} />}
-    {action && <View style={{ height: 105 * s, alignItems: 'center' }}>{actionHref ? <PreviewLink href={actionHref} label={action}><ActionFace label={action} /></PreviewLink> : <StaticAction label={action} />}</View>}
+    {action && <View style={{ height: 105 * s, alignItems: 'center' }}>{onAction ? <Pressable accessibilityRole="button" onPress={onAction}><ActionFace label={action} /></Pressable> : actionHref ? <PreviewLink href={actionHref} label={action}><ActionFace label={action} /></PreviewLink> : <StaticAction label={action} />}</View>}
     {overlay}
   </SafeAreaView></View></ScaleContext.Provider>;
 }
