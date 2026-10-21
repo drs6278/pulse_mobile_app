@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
-import { PulseText, Screen, TitleHeader, usePulseScale } from '@/components/pulse/ui';
+import { PreviewLink, PulseText, Screen, TitleHeader, usePulseScale } from '@/components/pulse/ui';
 import { PulseColors as C } from '@/constants/pulse-theme';
 import { useAuth } from '@/providers/auth-provider';
 
@@ -29,6 +29,7 @@ function SettingsContent() {
       <PulseText size={18} color={C.white} style={{ marginTop: 4 * s }}>{session?.user.email}</PulseText>
     </View>
     {error && <PulseText size={14} color={C.pink}>{error}</PulseText>}
+    <PreviewLink href="/schedule-settings" label="Schedule preferences and imports" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Schedule preferences and imports</PulseText></PreviewLink>
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled: signingOut }}

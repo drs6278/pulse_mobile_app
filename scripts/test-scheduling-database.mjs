@@ -1,0 +1,73 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import { PGlite } from '@electric-sql/pglite';
+
+// A fresh in-memory PostgreSQL instance only. Never reads .env or contacts Supabase.
+const migration = await fs.readFile(new URL('../supabase/migrations/202610190001_scheduling.sql', import.meta.url), 'utf8');
+const alice = '00000000-0000-0000-0000-000000000001';
+const bob = '00000000-0000-0000-0000-000000000002';
+const draft = { title: 'CS 101', kind: 'class', location: 'Library', start_local: '2026-10-26T09:00:00', end_local: '2026-10-26T10:00:00', timezone: 'America/New_York', term_end: '2026-12-01', all_day: false, busy: true, recurrence: { days: [1,3], interval: 1, weekStart: 1, count: null, until: null }, rdates: [], exdates: [], source_uid: 'cs101@test', content_key: 'cs101' };
+for (const type of ['uuid', 'bigint', 'text']) {
+  const db = new PGlite();
+  try {
+    await db.exec(`
+      create role anon; create role authenticated;
+      create schema auth;
+      create table auth.users(id uuid primary key);
+      create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+      grant usage on schema auth, public to authenticated,anon;
+      grant execute on function auth.uid() to authenticated,anon;
+      insert into auth.users values ('${alice}'),('${bob}');
+      create table public.events(id ${type} primary key,title text,event_date date,location text,category text);
+      alter table public.events enable row level security;
+      grant select on public.events to authenticated;
+      create policy signed_in_events on public.events for select to authenticated using (true);
+    `);
+    await db.exec(migration);
+    const eventId = type === 'uuid' ? '00000000-0000-0000-0000-000000000010' : type === 'bigint' ? '10' : 'event-10';
+    await db.query('insert into public.events(id,title,event_date,location,category) values($1,$2,$3,$4,$5)', [eventId,'Concert','2026-10-26','Hall','Music']);
+    await assert.rejects(db.query('update public.events set pulse_starts_at=$1,pulse_timezone=$2 where id=$3',['2026-10-26T14:00Z','UTC',eventId]),/pulse_event_times/);
+    await assert.rejects(db.query('update public.events set pulse_all_day_start=$1,pulse_timezone=$2 where id=$3',['2026-10-26','UTC',eventId]),/pulse_event_all_day/);
+    await db.query('update public.events set pulse_starts_at=$1,pulse_ends_at=$2,pulse_timezone=$3 where id=$4',['2026-10-26T14:00Z','2026-10-26T15:00Z','UTC',eventId]);
+    assert.equal((await db.query('select pulse_revision from public.events')).rows[0].pulse_revision,2);
+    await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','${alice}',false);`);
+    const save = await db.query('select * from public.save_schedule(null,0,$1::jsonb)', [JSON.stringify(draft)]);
+    const row = save.rows[0];
+    assert.equal(row.user_id, alice);
+    await assert.rejects(db.query('select public.save_schedule($1,999,$2::jsonb)', [row.id,JSON.stringify(draft)]), /changed/i);
+    await assert.rejects(db.query('select public.save_schedule(null,0,$1::jsonb)', [JSON.stringify({ ...draft, start_local: '2026-03-08T02:30:00', end_local: '2026-03-08T03:30:00', term_end: '2026-04-01', source_uid: 'invalid' })]), /Nonexistent/);
+    await db.query('select public.set_schedule_exception($1,1,$2,true)', [row.id,'2026-10-26T09:00:00']);
+    assert.equal((await db.query('select version from public.schedule_series')).rows[0].version, 2);
+    const importEntries = [{ id: null, version: 0, draft: { ...draft, source_uid: 'math@test', content_key: 'math', title: 'Math' }, exceptions: [] }];
+    const first = (await db.query('select public.commit_schedule_import($1,$2,$3::jsonb) as id', ['request-1','Fall',JSON.stringify(importEntries)])).rows[0].id;
+    const retry = (await db.query('select public.commit_schedule_import($1,$2,$3::jsonb) as id', ['request-1','Fall',JSON.stringify(importEntries)])).rows[0].id;
+    assert.equal(first,retry);
+    assert.equal((await db.query('select count(*)::int n from public.schedule_series')).rows[0].n,2);
+    const bad = [{ ...importEntries[0], draft: { ...draft, source_uid: 'first-new@test', content_key: 'first-new' } }, { ...importEntries[0], draft: { ...draft, source_uid: 'bad@test', title: '' } }];
+    await assert.rejects(db.query('select public.commit_schedule_import($1,$2,$3::jsonb)', ['request-2','Broken',JSON.stringify(bad)]));
+    assert.equal((await db.query('select count(*)::int n from public.schedule_imports')).rows[0].n,1);
+    assert.equal((await db.query('select count(*)::int n from public.schedule_series')).rows[0].n,2);
+    await db.query('insert into public.event_rsvps values($1,$2,$3) on conflict(user_id,event_id) do update set status=excluded.status', [alice,eventId,'going']);
+    await db.query('insert into public.event_rsvps values($1,$2,$3) on conflict(user_id,event_id) do update set status=excluded.status', [alice,eventId,'going']);
+    assert.equal((await db.query('select count(*)::int n from public.event_rsvps')).rows[0].n,1);
+    await db.exec(`select set_config('request.jwt.claim.sub','${bob}',false)`);
+    assert.equal((await db.query('select count(*)::int n from public.schedule_series')).rows[0].n,0);
+    assert.equal((await db.query('select count(*)::int n from public.event_rsvps')).rows[0].n,0);
+    await assert.rejects(db.query('select public.delete_schedule($1,2)',[row.id]),/changed/i);
+    await assert.rejects(db.query('insert into public.schedule_exceptions(user_id,series_id,recurrence_key,cancelled) values($1,$2,$3,true)',[bob,row.id,'2026-10-28T09:00:00']),/foreign key/i);
+    await assert.rejects(db.query('insert into public.event_rsvps values($1,$2,$3)',[alice,eventId,'going']),/row-level security/i);
+    await db.exec(`select set_config('request.jwt.claim.sub','${alice}',false)`);
+    await db.query('select public.delete_imported_schedules(null)');
+    assert.equal((await db.query('select count(*)::int n from public.schedule_series')).rows[0].n,1);
+    assert.equal((await db.query('select count(*)::int n from public.event_rsvps')).rows[0].n,1);
+    await db.exec('reset role');
+    await db.query('update public.events set pulse_cancelled=true where id=$1',[eventId]);
+    await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','${alice}',false)`);
+    await assert.rejects(db.query('update public.event_rsvps set status=$1 where user_id=$2',['going',alice]),/row-level security/i);
+    await db.query('update public.event_rsvps set status=$1 where user_id=$2',['cancelled',alice]);
+    await db.exec('set role anon');
+    await assert.rejects(db.query('select * from public.schedule_series'),/permission denied/i);
+    await assert.rejects(db.query('select public.delete_imported_schedules(null)'),/permission denied/i);
+    console.log(`PASS scheduling migration, RLS, import atomicity, retries, RSVP lifecycle (${type} event IDs)`);
+  } finally { await db.close(); }
+}

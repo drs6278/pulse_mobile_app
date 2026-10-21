@@ -31,7 +31,8 @@
           "backgroundColor": "#0E1116"
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      ["expo-calendar", { "calendarPermission": "Pulse uses calendar access only when you export, update, or remove a Pulse event in a calendar you select." }]
     ],
     "experiments": {
       "typedRoutes": true,

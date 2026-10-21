@@ -1,1 +1,1 @@
-export { CalendarScreen as default } from '@/components/pulse/screens';
+export { default } from '@/components/pulse/schedule/calendar-screen';

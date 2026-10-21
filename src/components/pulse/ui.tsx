@@ -100,12 +100,13 @@ export function SearchHeader({ query = 'search', home = false }: { query?: strin
   </View>;
 }
 
-export function BottomBar({ active }: { active?: 'home' | 'saved' | 'create' }) {
+export function BottomBar({ active }: { active?: 'home' | 'saved' | 'create' | 'calendar' }) {
   const s = usePulseScale();
-  return <View style={{ height: 75 * s, backgroundColor: C.surface, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 37 * s }}>
+  return <View style={{ minHeight: 75 * s, backgroundColor: C.surface, flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'center' }}>
     <PreviewLink href="/create" label="Create event"><PulseIcon name="add" color={active === 'create' ? C.pink : C.muted} /></PreviewLink>
     <PreviewLink href="/" label="Home"><PulseIcon name="home" color={active === 'home' ? C.pink : C.muted} /></PreviewLink>
     <PreviewLink href="/saved" label="Saved events"><PulseIcon name="bookmarkFilled" color={active === 'saved' ? C.pink : C.muted} /></PreviewLink>
+    <PreviewLink href="/calendar" label="Calendar" style={{ minWidth: 44, minHeight: 44, justifyContent: 'center' }}><PulseIcon name="date" color={active === 'calendar' ? C.pink : C.muted} /></PreviewLink>
   </View>;
 }
 
@@ -118,15 +119,16 @@ function ActionFace({ label }: { label: string }) {
   return <View style={{ width: 300 * s, height: 75 * s, borderRadius: 25 * s, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' }}><PulseText size={32} color={C.white}>{label}</PulseText></View>;
 }
 
-export function Screen({ children, header, activeTab, bottomBar = false, action, actionHref, onAction, overlay }: {
+export function Screen({ children, header, activeTab, bottomBar = false, action, actionHref, onAction, overlay, scroll = true }: {
   children: ReactNode;
   header: ReactNode;
-  activeTab?: 'home' | 'saved' | 'create';
+  activeTab?: 'home' | 'saved' | 'create' | 'calendar';
   bottomBar?: boolean;
   action?: string;
   actionHref?: Href;
   onAction?: () => void;
   overlay?: ReactNode;
+  scroll?: boolean;
 }) {
   const { width } = useWindowDimensions();
   // Keep exported HTML and the first hydrated render identical; then fit the phone.
@@ -134,9 +136,9 @@ export function Screen({ children, header, activeTab, bottomBar = false, action,
   const s = Math.min(hydrated && width > 0 ? width : 402, 402) / 402;
   return <ScaleContext.Provider value={s}><View style={styles.backdrop}><SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { maxWidth: 402 }]}>
     {header}
-    <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, minHeight: (874 - 75 - (bottomBar ? 75 : action ? 105 : 0)) * s }} showsVerticalScrollIndicator={false}>
+    {scroll ? <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, minHeight: (874 - 75 - (bottomBar ? 75 : action ? 105 : 0)) * s }} showsVerticalScrollIndicator={false}>
       {children}
-    </ScrollView>
+    </ScrollView> : <View style={{ flex: 1 }}>{children}</View>}
     {bottomBar && <BottomBar active={activeTab} />}
     {action && <View style={{ height: 105 * s, alignItems: 'center' }}>{onAction ? <Pressable accessibilityRole="button" onPress={onAction}><ActionFace label={action} /></Pressable> : actionHref ? <PreviewLink href={actionHref} label={action}><ActionFace label={action} /></PreviewLink> : <StaticAction label={action} />}</View>}
     {overlay}

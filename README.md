@@ -54,3 +54,11 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Pulse scheduling
+
+Calendar, private class/commitment management, reviewed ICS/CSV imports, live-event RSVPs, availability, compatible activities, and explicit calendar export are implemented in the application.
+
+See [Scheduling setup and architecture](docs/SCHEDULING.md) before running the new features. The Supabase migration must be reviewed against the deployed schema and applied separately. Native calendar export requires a development build; web exports ICS files.
+
+Checks: `npm run lint`, `npm run typecheck`, `npm test`, and `npm run test:database`. The database suite uses disposable local PostgreSQL and never touches hosted data.

@@ -112,20 +112,6 @@ function CreateContent() {
   </View>;
 }
 
-export function ImportScreen() {
-  return <Screen header={<TitleHeader title="Import Schedule" />} action="Import"><ImportContent /></Screen>;
-}
-
-function ImportContent() {
-  const s = usePulseScale();
-  return <View style={{ paddingTop: 44 * s }}>
-    <View style={{ marginHorizontal: 22 * s, height: 212 * s, backgroundColor: '#FEF7FF', borderColor: C.muted, borderWidth: 5 * s, borderRadius: 25 * s, overflow: 'hidden', flexDirection: 'row', justifyContent: 'center', gap: 16 * s }}>
-      {[0, 1, 2, 3].map(column => <View key={column} style={{ width: 70 * s, backgroundColor: 'rgba(1,135,134,0.12)' }} />)}
-    </View>
-    <View style={{ marginTop: 19 * s, marginLeft: 94 * s, flexDirection: 'row', gap: 15 * s, alignItems: 'center' }}><PulseIcon name="account" /><View accessibilityRole="button" accessibilityState={{ disabled: true }} aria-disabled style={{ width: 150 * s, height: 50 * s, borderRadius: 25 * s, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' }}><PulseText size={32} color={C.white}>Connect</PulseText></View></View>
-  </View>;
-}
-
 export function MapScreen() {
   return <Screen header={<TitleHeader title="Map" />} action="Get Directions" overlay={<MapGridOverlay />}><MapContent /></Screen>;
 }
@@ -148,36 +134,6 @@ function MapContent() {
   </View>;
 }
 
-export function CalendarScreen() {
-  return <Screen header={<SearchHeader />} bottomBar><CalendarContent /></Screen>;
-}
-
-function CalendarGrid() {
-  const s = usePulseScale();
-  const days = [null, ...Array.from({ length: 30 }, (_, i) => i + 1), 1, 2, 3, 4];
-  return <View accessibilityLabel="September 2025 calendar, September 9 through 13 selected" style={{ width: 318 * s, height: 308 * s, backgroundColor: C.muted, borderRadius: 16 * s, borderWidth: 1, borderColor: '#D9D9D9', paddingHorizontal: 13 * s }}>
-    <View style={{ height: 66 * s, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 7 * s }}>
-      <PulseIcon name="back" size={20} color={C.white} />
-      <View style={{ flexDirection: 'row', gap: 7 * s }}>
-        {['Sep', '2025'].map(label => <View key={label} style={{ width: 88 * s, height: 29 * s, borderRadius: 8 * s, borderWidth: 1, borderColor: '#D9D9D9', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 7 * s }}><Text style={{ color: C.white, fontSize: 16 * s }}>{label}</Text><View style={{ transform: [{ rotate: '90deg' }] }}><PulseIcon name="next" size={16} color={C.white} /></View></View>)}
-      </View>
-      <PulseIcon name="next" size={20} color={C.white} />
-    </View>
-    <View style={{ flexDirection: 'row', height: 21 * s }}>{['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => <Text key={day} style={{ flex: 1, textAlign: 'center', fontSize: 12 * s, color: C.white }}>{day}</Text>)}</View>
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{days.map((day, i) => <View key={i} style={{ width: '14.285714%', height: 41 * s, alignItems: 'center', justifyContent: 'center' }}><View style={{ width: 40 * s, height: 40 * s, borderRadius: 8 * s, backgroundColor: i === 9 || i === 13 ? C.pink : 'transparent', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: i > 30 ? '#B3B3B3' : C.white, fontSize: 16 * s }}>{day}</Text></View></View>)}</View>
-  </View>;
-}
-
-function CalendarContent() {
-  const s = usePulseScale();
-  return <View style={{ paddingTop: 27 * s }}>
-    <PulseText size={32} font="black" color={C.white} lineHeight={40} style={{ marginLeft: 45 * s }}>Calendar</PulseText>
-    <View style={{ marginTop: 33 * s, alignItems: 'center' }}><CalendarGrid /></View>
-    <PulseText size={32} font="black" color={C.white} lineHeight={40} style={{ marginTop: 33 * s, marginLeft: 45 * s }}>Upcoming</PulseText>
-    <View style={{ marginTop: 19 * s, marginHorizontal: 14 * s }}><EventRow title="Concert" subtitle="Jiffy Lube - 7:30 PM" image={Images.calendar} /></View>
-  </View>;
-}
-
 const previews = [
   ['/', 'Home Dashboard'], ['/categories', 'Browse Categories'], ['/filters', 'Filter & Sort'],
   ['/search', 'Search Results'], ['/saved', 'Saved Events'], ['/event', 'Event Details'],
@@ -192,7 +148,7 @@ export function ScreensIndex() {
 function PreviewContent() {
   const s = usePulseScale();
   return <View style={{ padding: 20 * s, gap: 12 * s }}>
-    <PulseText font="regular" color={C.muted} style={{ marginBottom: 8 * s }}>Event browsing and filters use Supabase. Other event actions and fields are previews.</PulseText>
+    <PulseText font="regular" color={C.muted} style={{ marginBottom: 8 * s }}>Calendar, imports, live event RSVPs and event browsing use Supabase. Event creation, saved events and map details remain previews.</PulseText>
     {previews.map(([href, label]) => <PreviewLink key={href} href={href} label={label} style={{ backgroundColor: C.surface, padding: 16 * s, borderRadius: 14 * s, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><PulseText size={18}>{label}</PulseText><PulseIcon name="next" size={24} color={C.pink} /></PreviewLink>)}
   </View>;
 }

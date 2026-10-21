@@ -4,10 +4,11 @@ import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 
 import { PulseColors as C } from '@/constants/pulse-theme';
 import { dateOptions, defaultEventFilters, eventCategories, validateEventFilters, type EventFilters } from '@/lib/event-filters';
-import { eventColumns, EVENTS_PER_PAGE, type PulseEvent } from '@/lib/event-query';
+import { eventColumns, eventDetailsColumns, EVENTS_PER_PAGE, type PulseEvent } from '@/lib/event-query';
 import { supabase } from '@/lib/supabase';
 import { useEvents } from '@/providers/events-provider';
 import { PreviewLink, PulseText, Screen, TitleHeader, usePulseScale } from './ui';
+import { EventActions } from './schedule/event-actions';
 
 function EventDate({ value }: { value: string }) {
   const [year, month, day] = value.split('-').map(Number);
@@ -91,7 +92,10 @@ export function SupabaseEventScreen({ id }: { id: string }) {
     let active = true;
     void (async () => {
       try {
-        const { data, error: queryError } = await supabase.from('events').select(eventColumns).eq('id', id).abortSignal(controller.signal).maybeSingle<PulseEvent>();
+        let response = await supabase.from('events').select(eventDetailsColumns).eq('id', id).abortSignal(controller.signal).maybeSingle<PulseEvent>();
+        // Existing discovery/details remain usable before scheduling is deployed.
+        if (response.error && ['42703', 'PGRST204'].includes(response.error.code)) response = await supabase.from('events').select(eventColumns).eq('id', id).abortSignal(controller.signal).maybeSingle<PulseEvent>();
+        const { data, error: queryError } = response;
         if (queryError) throw queryError;
         if (active) setResult({ key, event: data, error: data ? null : 'This event is no longer available.' });
       } catch {
@@ -100,9 +104,12 @@ export function SupabaseEventScreen({ id }: { id: string }) {
     })();
     return () => { active = false; controller.abort(); };
   }, [id, key]);
-  return <Screen header={<TitleHeader title="Event details" />}><View style={{ padding: 16, gap: 16 }}>
+  return <Screen header={<TitleHeader title="Event details" right={<TextButton label="Refresh" onPress={() => setRevision(value => value + 1)} />} />}><View style={{ padding: 16, gap: 16 }}>
     {loading ? <ActivityIndicator accessibilityLabel="Loading event" color={C.pink} /> : error ? <View accessibilityRole="alert"><PulseText>{error}</PulseText><TextButton label="Try again" onPress={() => setRevision(value => value + 1)} /></View> : event && <>
       <PulseText color={C.pink}>{event.category}</PulseText><PulseText size={28} font="black">{event.title}</PulseText><EventDate value={event.event_date} /><PulseText>{event.location}</PulseText>
+      {event.pulse_all_day_start && <PulseText size={14}>All day: {event.pulse_all_day_start} through {event.pulse_all_day_end} (exclusive end; {event.pulse_timezone ?? 'UTC'})</PulseText>}
+      {event.pulse_starts_at && <PulseText size={14}>{new Date(event.pulse_starts_at).toLocaleString(undefined, { timeZone: event.pulse_timezone ?? 'UTC' })} – {event.pulse_ends_at ? new Date(event.pulse_ends_at).toLocaleString(undefined, { timeZone: event.pulse_timezone ?? 'UTC' }) : 'Time unavailable'} ({event.pulse_timezone ?? 'UTC'})</PulseText>}
+      <EventActions key={String(event.id)} event={event} />
     </>}
   </View></Screen>;
 }
