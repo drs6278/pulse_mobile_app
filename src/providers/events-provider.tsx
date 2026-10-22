@@ -5,11 +5,13 @@ import { EVENTS_PER_PAGE, fetchEvents, type PulseEvent } from '@/lib/event-query
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './auth-provider';
 
-type Request = { filters: EventFilters; search: ReturnType<typeof buildEventSearch>; page: number };
+type Request = { filters: EventFilters; search: ReturnType<typeof buildEventSearch> & { title: string }; title: string; page: number };
 type Result = { request: Request; userId: string; events: PulseEvent[]; count: number; error: string | null };
 type EventsContextValue = {
   filters: EventFilters;
+  titleSearch: string;
   applyFilters: (filters: EventFilters) => void;
+  setTitleSearch: (title: string) => void;
   events: PulseEvent[];
   count: number;
   loading: boolean;
@@ -22,7 +24,7 @@ const EventsContext = createContext<EventsContextValue | null>(null);
 
 export function EventsProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
-  const [request, setRequest] = useState<Request>(() => ({ filters: defaultEventFilters, search: buildEventSearch(defaultEventFilters), page: 0 }));
+  const [request, setRequest] = useState<Request>(() => ({ filters: defaultEventFilters, search: { ...buildEventSearch(defaultEventFilters), title: '' }, title: '', page: 0 }));
   const [result, setResult] = useState<Result | null>(null);
   const userId = session?.user.id;
   // Results belong to one request and user. Old responses can never appear under
@@ -43,7 +45,10 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   }, [request, userId]);
 
   function applyFilters(filters: EventFilters) {
-    setRequest({ filters: { ...filters }, search: buildEventSearch(filters), page: 0 });
+    setRequest(previous => ({ ...previous, filters: { ...filters }, search: { ...buildEventSearch(filters), title: previous.title.trim() }, page: 0 }));
+  }
+  function setTitleSearch(title: string) {
+    setRequest(previous => ({ ...previous, title, search: { ...previous.search, title: title.trim() }, page: 0 }));
   }
   function changePage(page: number) {
     if (loading || page < 0 || page * EVENTS_PER_PAGE >= (current?.count ?? 0)) return;
@@ -53,7 +58,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   function refresh() {
     applyFilters(request.filters);
   }
-  return <EventsContext.Provider value={{ filters: request.filters, applyFilters, events: current?.events ?? [], count: current?.count ?? 0, loading, error: current?.error ?? null, page: request.page, changePage, refresh }}>{children}</EventsContext.Provider>;
+  return <EventsContext.Provider value={{ filters: request.filters, titleSearch: request.title, applyFilters, setTitleSearch, events: current?.events ?? [], count: current?.count ?? 0, loading, error: current?.error ?? null, page: request.page, changePage, refresh }}>{children}</EventsContext.Provider>;
 }
 
 export function useEvents() {

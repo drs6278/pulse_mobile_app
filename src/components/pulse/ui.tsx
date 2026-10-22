@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
   type StyleProp,
@@ -16,6 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PulseColors as C, PulseFonts } from '@/constants/pulse-theme';
+import { useEvents } from '@/providers/events-provider';
 
 const ScaleContext = createContext(1);
 export const usePulseScale = () => useContext(ScaleContext);
@@ -91,11 +93,13 @@ export function TitleHeader({ title, close, right }: { title: string; close?: bo
 
 export function SearchHeader({ query = 'search', home = false }: { query?: string; home?: boolean }) {
   const s = usePulseScale();
+  const { titleSearch, setTitleSearch } = useEvents();
   return <View style={{ height: 75 * s, backgroundColor: C.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10 * s, gap: 18 * s }}>
     <PreviewLink href="/filters" label="Filter and sort" style={home ? { transform: [{ translateX: 18 * s }] } : undefined}><PulseIcon name="filter" /></PreviewLink>
-    <PreviewLink href="/search" label="Preview search results" style={{ flex: 1, height: 50 * s, borderRadius: 28 * s, backgroundColor: C.search, paddingLeft: 24 * s, paddingRight: 16 * s, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-      <Text style={{ color: C.muted, fontSize: 16 * s, letterSpacing: 0.5 * s }}>{query}</Text><PulseIcon name="search" size={24} />
-    </PreviewLink>
+    <View style={{ flex: 1, height: 50 * s, borderRadius: 28 * s, backgroundColor: C.search, paddingLeft: 24 * s, paddingRight: 16 * s, flexDirection: 'row', alignItems: 'center', gap: 8 * s }}>
+      <TextInput accessibilityLabel="Search events by title" value={titleSearch} placeholder={query} placeholderTextColor={C.muted} returnKeyType="search" autoCorrect={false} onChangeText={setTitleSearch} style={{ flex: 1, color: C.white, fontSize: 16 * s, letterSpacing: 0.5 * s, paddingVertical: 0 }} />
+      <PulseIcon name="search" size={24} />
+    </View>
     <PreviewLink href="/screens" label="Browse all screen previews"><PulseIcon name="account" /></PreviewLink>
   </View>;
 }

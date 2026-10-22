@@ -47,7 +47,7 @@ export async function fetchCalendarCandidates(client: SupabaseClient, start: str
   throw new Error('Too many events in this date range. Choose a smaller range.');
 }
 
-type EventSearch = { categories: string[]; start: string; end: string | null };
+type EventSearch = { categories: string[]; start: string; end: string | null; title: string };
 
 export async function fetchEvents(client: SupabaseClient, search: EventSearch, page: number, signal: AbortSignal) {
   let query = client.from('events').select(eventColumns, { count: 'exact' })
@@ -55,6 +55,7 @@ export async function fetchEvents(client: SupabaseClient, search: EventSearch, p
     .order('event_date', { ascending: true }).order('id', { ascending: true });
   if (search.categories.length) query = query.in('category', search.categories);
   if (search.end) query = query.lte('event_date', search.end);
+  if (search.title) query = query.ilike('title', `%${search.title}%`);
   const first = page * EVENTS_PER_PAGE;
   const { data, error, count } = await query.range(first, first + EVENTS_PER_PAGE - 1).abortSignal(signal).returns<PulseEvent[]>();
   if (error) throw error;
