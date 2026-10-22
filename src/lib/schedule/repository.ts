@@ -46,14 +46,18 @@ export async function setException(client: SupabaseClient, series: ScheduleSerie
   const { error } = await client.rpc('set_schedule_exception', { p_series: series.id, p_version: series.version, p_key: key, p_cancelled: cancelled, p_start: start, p_end: end });
   if (error) throw error;
 }
-export async function commitImport(client: SupabaseClient, key: string, label: string, decisions: ImportDecision[]) {
+export async function commitImport(client: SupabaseClient, key: string, label: string, decisions: ImportDecision[], sourceId?: string) {
   const entries = decisions.filter(item => item.action !== 'skip').map(item => {
     const errors = validateSchedule(item.candidate.draft);
     if (errors.length || item.candidate.issues.length) throw new Error('Correct or deselect invalid entries before saving.');
     return { id: item.action === 'update' ? item.existing?.id : null, version: item.existing?.version ?? 0, clear_exceptions: true, draft: { ...item.candidate.draft, content_key: contentKey(item.candidate.draft) }, exceptions: item.candidate.exceptions };
   });
   if (!entries.length) throw new Error('Select at least one valid entry.');
-  const { error } = await client.rpc('commit_schedule_import', { p_key: key, p_label: label.slice(0, 200), p_entries: entries });
+  const { error } = await client.rpc('commit_schedule_import', { p_key: key, p_label: label.slice(0, 200), p_entries: entries, ...(sourceId ? { p_source: sourceId } : {}) });
+  if (error) throw error;
+}
+export async function clearSchedule(client: SupabaseClient) {
+  const { error } = await client.rpc('clear_schedule');
   if (error) throw error;
 }
 export async function deleteImported(client: SupabaseClient, importId: string | null) {

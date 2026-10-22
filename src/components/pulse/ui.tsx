@@ -1,12 +1,14 @@
 import { Image, type ImageSource } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, router, type Href } from 'expo-router';
-import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react';
+import { createContext, useContext, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEvents } from '@/providers/events-provider';
 import {
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
   type StyleProp,
@@ -91,11 +93,17 @@ export function TitleHeader({ title, close, right }: { title: string; close?: bo
 
 export function SearchHeader({ query = 'search', home = false }: { query?: string; home?: boolean }) {
   const s = usePulseScale();
+  const { filters, applyFilters } = useEvents();
+  const [draft, setDraft] = useState({ source: filters, value: filters.keyword ?? '' });
+  const keyword = draft.source === filters ? draft.value : filters.keyword ?? '';
+  const setKeyword = (value: string) => setDraft({ source: filters, value });
+  const search = () => { applyFilters({ ...filters, keyword }); router.navigate('/search'); };
   return <View style={{ height: 75 * s, backgroundColor: C.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10 * s, gap: 18 * s }}>
     <PreviewLink href="/filters" label="Filter and sort" style={home ? { transform: [{ translateX: 18 * s }] } : undefined}><PulseIcon name="filter" /></PreviewLink>
-    <PreviewLink href="/search" label="Preview search results" style={{ flex: 1, height: 50 * s, borderRadius: 28 * s, backgroundColor: C.search, paddingLeft: 24 * s, paddingRight: 16 * s, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-      <Text style={{ color: C.muted, fontSize: 16 * s, letterSpacing: 0.5 * s }}>{query}</Text><PulseIcon name="search" size={24} />
-    </PreviewLink>
+    <View style={{ flex: 1, minHeight: 50 * s, borderRadius: 28 * s, backgroundColor: C.search, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center' }}>
+      <TextInput accessibilityLabel="Search events by keyword" placeholder={query} placeholderTextColor={C.muted} value={keyword} onChangeText={setKeyword} onSubmitEditing={search} returnKeyType="search" maxLength={200} style={{ flex: 1, minHeight: 44, color: C.white, fontSize: 16 }} />
+      <Pressable accessibilityRole="button" accessibilityLabel="Search events" onPress={search} style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'center' }}><PulseIcon name="search" size={24} /></Pressable>
+    </View>
     <PreviewLink href="/screens" label="Browse all screen previews"><PulseIcon name="account" /></PreviewLink>
   </View>;
 }

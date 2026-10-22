@@ -64,6 +64,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
     "test:database": "node scripts/test-scheduling-database.mjs",
+    "test:community": "node scripts/test-community-database.mjs",
+    "test:discovery": "node scripts/test-discovery-database.mjs",
     "inspect:backend": "node scripts/inspect-backend.cjs"
   },
   "private": true

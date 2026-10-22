@@ -4,6 +4,7 @@ import { localDate, toLocal, validZone, wallTime } from '../time';
 import { MAX_FILE_BYTES, MAX_RECORDS, type ImportCandidate, type ImportResult, type ScheduleDraft } from '../types';
 import { validateSchedule } from '../validation';
 import { weekdays } from './csv';
+import { utf8Bytes } from './utf8';
 
 type Time = InstanceType<typeof ICAL.Time>;
 type Component = InstanceType<typeof ICAL.Component>;
@@ -17,7 +18,7 @@ function zoneFor(component: Component, property: string, fallback: string) {
   return zone ? String(zone) : fallback;
 }
 export function parseICS(text: string, timezone: string, termEnd: string): ImportResult {
-  if (text.length > MAX_FILE_BYTES) throw new Error('File exceeds the 2 MiB limit.');
+  if (utf8Bytes(text).byteLength > MAX_FILE_BYTES) throw new Error('File exceeds the 2 MiB limit.');
   if (!localDate(termEnd)) throw new Error('Enter a valid semester end date.');
   let calendar: Component;
   try { calendar = new ICAL.Component(ICAL.parse(text)); } catch { throw new Error('This is not a valid ICS calendar.'); }

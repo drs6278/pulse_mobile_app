@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PulseColors as C, PulseImages as Images } from '@/constants/pulse-theme';
@@ -84,33 +84,7 @@ function EventContent() {
   </View>;
 }
 
-export function CreateScreen() {
-  return <Screen header={<SearchHeader />} bottomBar activeTab="create"><CreateContent /></Screen>;
-}
-
-function StaticField({ label }: { label: string }) {
-  const s = usePulseScale();
-  return <View accessibilityLabel={`${label}: Input, read only`} style={{ width: 210 * s, height: 56 * s, borderBottomWidth: 1, borderColor: '#49454F', paddingHorizontal: 16 * s, paddingTop: 8 * s }}>
-    <Text style={{ color: C.white, fontSize: 12 * s, letterSpacing: 0.4 * s }}>{label}</Text>
-    <Text style={{ color: C.white, fontSize: 16 * s, letterSpacing: 0.5 * s, marginTop: 2 * s }}>Input</Text>
-    <View style={{ position: 'absolute', right: 12 * s, top: 16 * s }}><PulseIcon name="clear" size={24} color={C.white} /></View>
-  </View>;
-}
-
-function CreateContent() {
-  const s = usePulseScale();
-  return <View style={{ paddingTop: 27 * s, alignItems: 'center' }}>
-    <PulseText font="black" size={24} color={C.white} lineHeight={32}>Create an Event</PulseText>
-    <View style={{ marginTop: 24 * s, gap: 35 * s, transform: [{ translateX: -10 * s }] }}><StaticField label="Title" /><StaticField label="Location" /><StaticField label="Time" /></View>
-    <View style={{ marginTop: 35 * s, width: 250 * s, height: 200 * s, transform: [{ translateX: -10 * s }] }}>
-      <Text style={{ color: C.white, fontSize: 14 * s, marginLeft: 24 * s, marginTop: 18 * s }}>Select date</Text>
-      <View style={{ marginTop: 39 * s, paddingBottom: 12 * s, paddingHorizontal: 24 * s, borderBottomWidth: 1, borderColor: '#CAC4D0', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Text style={{ color: C.white, fontSize: 32 * s }}>Enter date</Text><PulseIcon name="date" size={24} color={C.white} /></View>
-      <View style={{ marginTop: 18 * s, marginHorizontal: 24 * s, height: 56 * s, borderWidth: 3 * s, borderTopLeftRadius: 4 * s, borderTopRightRadius: 4 * s, borderColor: C.muted, paddingHorizontal: 12 * s, justifyContent: 'center' }}>
-        <Text style={{ position: 'absolute', top: -9 * s, left: 9 * s, backgroundColor: C.background, paddingHorizontal: 4 * s, color: C.muted, fontSize: 12 * s }}>Date</Text><Text style={{ color: '#1D1B20', fontSize: 16 * s }}>mm/dd/yyyy</Text>
-      </View>
-    </View>
-  </View>;
-}
+export { EventWorkspaceScreen as CreateScreen } from './community-screens';
 
 export function MapScreen() {
   return <Screen header={<TitleHeader title="Map" />} action="Get Directions" overlay={<MapGridOverlay />}><MapContent /></Screen>;
@@ -148,7 +122,7 @@ export function ScreensIndex() {
 function PreviewContent() {
   const s = usePulseScale();
   return <View style={{ padding: 20 * s, gap: 12 * s }}>
-    <PulseText font="regular" color={C.muted} style={{ marginBottom: 8 * s }}>Calendar, imports, live event RSVPs and event browsing use Supabase. Event creation, saved events and map details remain previews.</PulseText>
+    <PulseText font="regular" color={C.muted} style={{ marginBottom: 8 * s }}>Calendar, imports, live event RSVPs and event browsing use Supabase. Clubs, event creation and event management use Supabase. Saved events and map details remain previews.</PulseText>
     {previews.map(([href, label]) => <PreviewLink key={href} href={href} label={label} style={{ backgroundColor: C.surface, padding: 16 * s, borderRadius: 14 * s, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><PulseText size={18}>{label}</PulseText><PulseIcon name="next" size={24} color={C.pink} /></PreviewLink>)}
   </View>;
 }

@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useDiscoveryRefresh } from '@/hooks/use-discovery-refresh';
 
 import { buildEventSearch, defaultEventFilters, type EventFilters } from '@/lib/event-filters';
 import { EVENTS_PER_PAGE, fetchEvents, type PulseEvent } from '@/lib/event-query';
@@ -50,9 +51,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     // Keep the date bounds fixed while paging through the same search.
     setRequest(previous => ({ ...previous, page }));
   }
-  function refresh() {
-    applyFilters(request.filters);
-  }
+  const refresh = useCallback(() => setRequest(previous => ({ ...previous })), []);
+  useDiscoveryRefresh(refresh, `feed:${userId}`);
   return <EventsContext.Provider value={{ filters: request.filters, applyFilters, events: current?.events ?? [], count: current?.count ?? 0, loading, error: current?.error ?? null, page: request.page, changePage, refresh }}>{children}</EventsContext.Provider>;
 }
 

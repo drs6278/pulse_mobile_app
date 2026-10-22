@@ -1,6 +1,7 @@
 export const eventCategories = ['Food', 'Music', 'Sports', 'Arts', 'Outdoors', 'Other'] as const;
 export const dateOptions = ['Upcoming', 'Today', 'Tomorrow', 'This Week', 'This Weekend', 'Pick Date'] as const;
 export type EventFilters = {
+  keyword?: string;
   categories: typeof eventCategories[number][];
   date: typeof dateOptions[number];
   customDate: string;
@@ -41,6 +42,7 @@ export function buildEventSearch(filters: EventFilters, now = new Date()) {
   end.setDate(end.getDate() + days - 1);
   const dateKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   return {
+    keyword: filters.keyword?.trim() ?? '',
     categories: filters.categories,
     start: dateKey(start),
     end: filters.date === 'Upcoming' ? null : dateKey(end),

@@ -8,7 +8,8 @@ export function compareImport(candidates: ImportCandidate[], existing: ScheduleS
   return candidates.map(candidate => {
     const key = contentKey(candidate.draft), uid = candidate.draft.source_uid;
     const repeated = seenContent.has(key) || (!!uid && seenUIDs.has(uid));
-    seenContent.add(key); if (uid) seenUIDs.add(uid);
+    // A broken row must not suppress a subsequent valid copy.
+    if (!candidate.issues.length) { seenContent.add(key); if (uid) seenUIDs.add(uid); }
     const identity = uid ? existing.find(item => item.source_uid === uid) : undefined;
     const equivalent = existing.find(item => contentKey(item) === key);
     if (repeated || candidate.issues.length) return { candidate, action: 'skip', reason: repeated ? 'repeated' : 'invalid' };

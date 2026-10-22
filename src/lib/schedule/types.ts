@@ -17,7 +17,13 @@ export type ScheduleOccurrence = Interval & {
 };
 export type SchedulePreferences = { timezone: string; day_start: string; day_end: string; minimum_gap: number; categories: string[]; version: number };
 export type ScheduleImport = { id: string; label: string; created_at: string };
-export type ImportCandidate = { key: string; draft: ScheduleDraft; exceptions: Omit<ScheduleException, 'series_id' | 'user_id'>[]; issues: string[] };
+export type ImportFieldIssue = { field: keyof ScheduleDraft; message: string };
+export type ImportCandidate = {
+  key: string; draft: ScheduleDraft; exceptions: Omit<ScheduleException, 'series_id' | 'user_id'>[]; issues: string[];
+  // Parser-level errors persist until the corresponding field is corrected.
+  fieldIssues?: ImportFieldIssue[]; structuralIssues?: string[];
+};
+export type ScheduleSource = { id: string; object_path: string; label: string; format: 'ics' | 'csv' };
 export type ImportResult = { candidates: ImportCandidate[]; errors: string[]; warnings: string[] };
 export type ImportDecision = { candidate: ImportCandidate; action: 'add' | 'skip' | 'update'; existing?: ScheduleSeries; reason?: 'changed' | 'duplicate' | 'invalid' | 'repeated' };
 export type Compatibility = 'compatible' | 'conflicting' | 'unknown';

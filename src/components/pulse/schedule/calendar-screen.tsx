@@ -8,6 +8,7 @@ import { fetchCalendarCandidates, type PulseEvent } from '@/lib/event-query';
 import { freeWindows } from '@/lib/schedule/availability';
 import { rankEvents } from '@/lib/schedule/recommendations';
 import { defaultPreferences } from '@/lib/schedule/time';
+import { hasMultipleOccurrences } from '@/lib/schedule/import/review';
 import { scheduleError } from '@/lib/schedule/repository';
 import { setRSVP } from '@/lib/rsvp-repository';
 import { supabase } from '@/lib/supabase';
@@ -43,7 +44,7 @@ export default function CalendarScreen() {
   }, [refresh]));
   const selectedRange = { start: day.toMillis(), end: day.plus({ days: 1 }).toMillis() };
   const entries = [
-    ...calendar.occurrences.map(item => ({ id: item.id, title: item.title, location: item.location, start: item.start, end: item.end, allDay: item.allDay, href: { pathname: '/schedule-entry' as const, params: { id: item.seriesId, occurrence: item.recurrenceKey } }, kind: item.kind })),
+    ...calendar.occurrences.map(item => ({ id: item.id, title: item.title, location: item.location, start: item.start, end: item.end, allDay: item.allDay, href: { pathname: '/schedule-entry' as const, params: { id: item.seriesId, ...(schedule.data?.series.some(series => series.id === item.seriesId && hasMultipleOccurrences(series)) ? { occurrence: item.recurrenceKey } : {}) } }, kind: item.kind })),
     ...calendar.events.map(item => ({ id: `event:${item.event.id}`, title: item.event.title, location: item.event.location, start: item.start, end: item.end, allDay: !!item.event.pulse_all_day_start, href: { pathname: '/event' as const, params: { id: String(item.event.id) } }, kind: 'Pulse event' })),
   ].filter(item => item.start < selectedRange.end && selectedRange.start < item.end).sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
   const windows = calendar.complete ? freeWindows(calendar.busy, {
@@ -74,6 +75,7 @@ export default function CalendarScreen() {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
           <PreviewLink href="/schedule-entry" label="Add a class or commitment" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Add entry</PulseText></PreviewLink>
           <PreviewLink href="/import-schedule" label="Import schedule" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Import</PulseText></PreviewLink>
+          <PreviewLink href="/schedule-settings" label="Manage all schedule entries" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Manage entries</PulseText></PreviewLink>
         </View>
         <Message text={calendar.error} error />{calendar.loading && <Loading />}
         {!!calendar.unknown.length && <Message text={`${calendar.unknown.length} RSVP(s) have unknown times or are unavailable. Availability cannot be confirmed.`} />}
