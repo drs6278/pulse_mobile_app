@@ -63,18 +63,6 @@ See [Scheduling setup and architecture](docs/SCHEDULING.md) before running the n
 
 Checks: `npm run lint`, `npm run typecheck`, `npm test`, and `npm run test:database`. The database suite uses disposable local PostgreSQL and never touches hosted data.
 
-## Pulse clubs and events (Phase 2)
-
-The Create tab opens event and club management. Users can create clubs, join or leave, administer membership roles, and create personal or club-hosted events with drafts, editing, publishing, cancellation, and invitations.
-
-Apply the database migration before using these features. See [Phase 2 requirements, setup, and verification](docs/CLUBS_EVENTS.md). Run `npm run test:community` to verify authorization and lifecycle rules in disposable PostgreSQL databases.
-
-## Discovery and RSVP (Phase 3)
-
-Search upcoming events by keyword, category and date; view attendance counts; RSVP or join a full event's waitlist. My RSVPs & waitlists supports cancellation, and available seats automatically go to eligible users in queue order. Organizers can set capacity in the event editor after saving a draft.
-
-Apply the Phase 3 migration before deploying this client. See [Phase 3 setup and validation](docs/DISCOVERY_RSVP.md). Run `npm run test:discovery` for isolated database verification.
-
 ## Schedule import and editing completion
 
 Editable ICS/CSV previews, private temporary uploads, conflict warnings, entry management, and clear-schedule support are implemented. Apply the additional migration, deploy both Edge Functions, and configure source cleanup before using file imports. See [Schedule review deployment and validation](docs/SCHEDULE_REVIEW.md). Image/PDF imports are deferred.

@@ -4,6 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 
 // A fresh in-memory PostgreSQL instance only. Never reads .env or contacts Supabase.
 const migration = await fs.readFile(new URL('../supabase/migrations/202610190001_scheduling.sql', import.meta.url), 'utf8');
+const eventCreation = await fs.readFile(new URL('../supabase/migrations/202610210001_event_creation.sql', import.meta.url), 'utf8');
 const alice = '00000000-0000-0000-0000-000000000001';
 const bob = '00000000-0000-0000-0000-000000000002';
 const draft = { title: 'CS 101', kind: 'class', location: 'Library', start_local: '2026-10-26T09:00:00', end_local: '2026-10-26T10:00:00', timezone: 'America/New_York', term_end: '2026-12-01', all_day: false, busy: true, recurrence: { days: [1,3], interval: 1, weekStart: 1, count: null, until: null }, rdates: [], exdates: [], source_uid: 'cs101@test', content_key: 'cs101' };
@@ -68,6 +69,20 @@ for (const type of ['uuid', 'bigint', 'text']) {
     await db.exec('set role anon');
     await assert.rejects(db.query('select * from public.schedule_series'),/permission denied/i);
     await assert.rejects(db.query('select public.delete_imported_schedules(null)'),/permission denied/i);
-    console.log(`PASS scheduling migration, RLS, import atomicity, retries, RSVP lifecycle (${type} event IDs)`);
+    await db.exec('reset role');
+    await db.exec(eventCreation);
+    const post = ['Pickup','Gym','Sports','2026-11-02','2026-11-02T22:00Z','2026-11-02T23:00Z','America/New_York'];
+    const insertEvent = 'insert into public.events(title,location,category,event_date,pulse_starts_at,pulse_ends_at,pulse_timezone) values($1,$2,$3,$4,$5,$6,$7) returning id::text,created_by';
+    await db.exec('set role anon');
+    await assert.rejects(db.query(insertEvent, post),/permission denied/i);
+    await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','${alice}',false)`);
+    const posted = (await db.query(insertEvent, post)).rows[0];
+    assert.equal(posted.created_by, alice);
+    assert.ok(posted.id && posted.id !== String(eventId));
+    await assert.rejects(db.query('insert into public.events(title,location,category,event_date,created_by) values($1,$2,$3,$4,$5)',['Spoof','Gym','Sports','2026-11-02',bob]),/permission denied/i);
+    await assert.rejects(db.query('insert into public.events(id,title,location,category,event_date) values($1,$2,$3,$4,$5)',[eventId,'Clash','Gym','Sports','2026-11-02']),/permission denied/i);
+    await db.exec(`select set_config('request.jwt.claim.sub','',false)`);
+    await assert.rejects(db.query(insertEvent, post),/row-level security/i);
+    console.log(`PASS scheduling migration, RLS, import atomicity, retries, RSVP lifecycle, event creation (${type} event IDs)`);
   } finally { await db.close(); }
 }

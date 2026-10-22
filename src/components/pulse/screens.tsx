@@ -1,12 +1,16 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PulseColors as C, PulseImages as Images } from '@/constants/pulse-theme';
+import { createEvent, defaultEventDraft, type EventDraft } from '@/lib/event-create';
 import { eventCategories } from '@/lib/event-filters';
+import { supabase } from '@/lib/supabase';
 import { useEvents } from '@/providers/events-provider';
-import { EventFeed, EventFiltersScreen, SupabaseEventScreen } from './event-browser';
+import { EventFeed, EventFiltersScreen, FilterGroup, SupabaseEventScreen } from './event-browser';
+import { Button, Field, Message } from './schedule/controls';
 import {
   EventRow, Photo, PreviewLink, PulseIcon, PulseText, Screen,
   SearchHeader, Tag, TitleHeader, usePulseScale,
@@ -84,7 +88,37 @@ function EventContent() {
   </View>;
 }
 
-export { EventWorkspaceScreen as CreateScreen } from './community-screens';
+export function CreateScreen() {
+  return <Screen header={<SearchHeader />} bottomBar activeTab="create"><CreateContent /></Screen>;
+}
+
+function CreateContent() {
+  const s = usePulseScale();
+  const { refresh } = useEvents();
+  const [draft, setDraft] = useState(() => defaultEventDraft());
+  const [error, setError] = useState<string | null>(null), [busy, setBusy] = useState(false);
+  const change = (values: Partial<EventDraft>) => { setDraft(previous => ({ ...previous, ...values })); setError(null); };
+  async function post() {
+    setBusy(true); setError(null);
+    try {
+      const id = await createEvent(supabase, draft);
+      refresh();
+      router.replace({ pathname: '/event', params: { id } });
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to post event.'); setBusy(false); }
+  }
+  return <View style={{ padding: 16 * s, gap: 16 }}>
+    <PulseText font="black" size={24} color={C.white} lineHeight={32}>Create an Event</PulseText>
+    <Field label="Title" value={draft.title} onChange={title => change({ title })} editable={!busy} placeholder="Pick up basketball" />
+    <Field label="Location" value={draft.location} onChange={location => change({ location })} editable={!busy} placeholder="Junker main gym" />
+    <FilterGroup title="Category" options={eventCategories} value={draft.category} onChange={category => { if (!busy) change({ category }); }} />
+    <Message text="Use local times in the timezone below." />
+    <Field label="Timezone" value={draft.timezone} onChange={value => change({ timezone: value.trim() })} editable={!busy} placeholder="America/New_York" />
+    <Field label="Start (YYYY-MM-DDTHH:mm:ss)" value={draft.start_local} onChange={start_local => change({ start_local })} editable={!busy} />
+    <Field label="End (YYYY-MM-DDTHH:mm:ss)" value={draft.end_local} onChange={end_local => change({ end_local })} editable={!busy} />
+    <Message text={error} error />
+    <Button label={busy ? 'Posting…' : 'Post event'} onPress={() => void post()} disabled={busy} />
+  </View>;
+}
 
 export function MapScreen() {
   return <Screen header={<TitleHeader title="Map" />} action="Get Directions" overlay={<MapGridOverlay />}><MapContent /></Screen>;
@@ -122,7 +156,7 @@ export function ScreensIndex() {
 function PreviewContent() {
   const s = usePulseScale();
   return <View style={{ padding: 20 * s, gap: 12 * s }}>
-    <PulseText font="regular" color={C.muted} style={{ marginBottom: 8 * s }}>Calendar, imports, live event RSVPs and event browsing use Supabase. Clubs, event creation and event management use Supabase. Saved events and map details remain previews.</PulseText>
+    <PulseText font="regular" color={C.muted} style={{ marginBottom: 8 * s }}>Calendar, imports, live event RSVPs, event browsing and event creation use Supabase. Saved events and map details remain previews.</PulseText>
     {previews.map(([href, label]) => <PreviewLink key={href} href={href} label={label} style={{ backgroundColor: C.surface, padding: 16 * s, borderRadius: 14 * s, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><PulseText size={18}>{label}</PulseText><PulseIcon name="next" size={24} color={C.pink} /></PreviewLink>)}
   </View>;
 }

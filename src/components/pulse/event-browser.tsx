@@ -1,10 +1,5 @@
-import { EventManagementLink } from './event-management-link';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { useUserResource } from '@/hooks/use-user-resource';
-import { useDiscoveryRefresh } from '@/hooks/use-discovery-refresh';
-import { loadAttendance } from '@/lib/rsvp-repository';
-import { attendanceLabel, EventAttendance } from './attendance';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 
 import { PulseColors as C } from '@/constants/pulse-theme';
@@ -28,19 +23,13 @@ function TextButton({ label, onPress }: { label: string; onPress: () => void }) 
 export function EventFeed() {
   const s = usePulseScale();
   const { events, filters, loading, error, count, page, changePage, refresh } = useEvents();
-  const ids = JSON.stringify(events.map(event => event.id));
-  const loader = useCallback((_user: string, signal: AbortSignal) => loadAttendance(supabase, JSON.parse(ids), signal), [ids]);
-  const attendance = useUserResource(loader);
-  useDiscoveryRefresh(attendance.refresh, 'feed-attendance');
   return <View style={{ padding: 14 * s, gap: 16 * s }}>
-    <PreviewLink href="/rsvps" label="My RSVPs and waitlists"><PulseText color={C.pink}>My RSVPs & waitlists</PulseText></PreviewLink>
-    {!!filters.keyword && <PulseText>Search: {filters.keyword}</PulseText>}
     <PulseText size={18}>{filters.categories.length ? filters.categories.join(', ') : 'All categories'} · {filters.date === 'Pick Date' ? filters.customDate : filters.date}</PulseText>
     {loading ? <ActivityIndicator accessibilityLabel="Loading events" color={C.pink} /> : error ? <View accessibilityRole="alert"><PulseText>{error}</PulseText><TextButton label="Try again" onPress={refresh} /></View> : <>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><PulseText>{count} {count === 1 ? 'event' : 'events'} found</PulseText><TextButton label="Refresh" onPress={refresh} /></View>
       {events.length === 0 && <View style={{ gap: 12 }}><PulseText size={20}>No matching events</PulseText><PulseText color={C.muted}>Try another category or date, or check back later.</PulseText><PreviewLink href="/filters" label="Change filters"><PulseText color={C.pink}>Change filters</PulseText></PreviewLink></View>}
       {events.map(event => <PreviewLink key={event.id} href={{ pathname: '/event', params: { id: event.id } }} label={`Open ${event.title}`} style={{ borderRadius: 20 * s, overflow: 'hidden', backgroundColor: C.surface }}>
-        <View style={{ padding: 16 * s, gap: 8 }}><PulseText size={14} color={C.pink}>{event.category}</PulseText><PulseText size={24} font="black">{event.title}</PulseText><EventDate value={event.event_date} /><PulseText size={14} color={C.muted}>{event.location}</PulseText><PulseText size={14}>{attendance.data?.find(a => a.event_id === event.id) ? attendanceLabel(attendance.data.find(a => a.event_id === event.id)!) : 'Attendance unavailable'}</PulseText></View>
+        <View style={{ padding: 16 * s, gap: 8 }}><PulseText size={14} color={C.pink}>{event.category}</PulseText><PulseText size={24} font="black">{event.title}</PulseText><EventDate value={event.event_date} /><PulseText size={14} color={C.muted}>{event.location}</PulseText></View>
       </PreviewLink>)}
       {count > EVENTS_PER_PAGE && <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         {page > 0 ? <TextButton label="Previous" onPress={() => changePage(page - 1)} /> : <View />}
@@ -51,7 +40,7 @@ export function EventFeed() {
   </View>;
 }
 
-function FilterGroup<T extends string>({ title, options, value, onChange }: { title: string; options: readonly T[]; value: T; onChange: (value: T) => void }) {
+export function FilterGroup<T extends string>({ title, options, value, onChange }: { title: string; options: readonly T[]; value: T; onChange: (value: T) => void }) {
   const s = usePulseScale();
   return <View style={{ gap: 12 * s }}><PulseText size={32}>{title}</PulseText><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 * s }}>
     {options.map(option => <Pressable key={option} accessibilityRole="radio" accessibilityLabel={`${title}: ${option}`} accessibilityState={{ checked: value === option }} onPress={() => onChange(option)} style={{ minHeight: 44, minWidth: 80 * s, paddingHorizontal: 14 * s, paddingVertical: 10 * s, borderRadius: 25 * s, borderWidth: 2, borderColor: value === option ? C.pink : C.muted, backgroundColor: value === option ? C.pink : 'transparent', alignItems: 'center', justifyContent: 'center' }}><PulseText size={14} color={value === option ? C.white : C.muted}>{option}</PulseText></Pressable>)}
@@ -93,8 +82,6 @@ export function EventFiltersScreen() {
 export function SupabaseEventScreen({ id }: { id: string }) {
   const [result, setResult] = useState<{ key: string; event: PulseEvent | null; error: string | null } | null>(null);
   const [revision, setRevision] = useState(0);
-  const refresh = useCallback(() => setRevision(value => value + 1), []);
-  useDiscoveryRefresh(refresh, `detail:${id}`);
   const key = `${id}:${revision}`;
   const current = result?.key === key ? result : null;
   const loading = !current;
@@ -122,7 +109,7 @@ export function SupabaseEventScreen({ id }: { id: string }) {
       <PulseText color={C.pink}>{event.category}</PulseText><PulseText size={28} font="black">{event.title}</PulseText><EventDate value={event.event_date} /><PulseText>{event.location}</PulseText>
       {event.pulse_all_day_start && <PulseText size={14}>All day: {event.pulse_all_day_start} through {event.pulse_all_day_end} (exclusive end; {event.pulse_timezone ?? 'UTC'})</PulseText>}
       {event.pulse_starts_at && <PulseText size={14}>{new Date(event.pulse_starts_at).toLocaleString(undefined, { timeZone: event.pulse_timezone ?? 'UTC' })} – {event.pulse_ends_at ? new Date(event.pulse_ends_at).toLocaleString(undefined, { timeZone: event.pulse_timezone ?? 'UTC' }) : 'Time unavailable'} ({event.pulse_timezone ?? 'UTC'})</PulseText>}
-      <PulseText>{event.pulse_description}</PulseText><PulseText size={14}>{event.pulse_status} / {event.pulse_visibility}</PulseText><EventManagementLink event={event} /><EventAttendance eventId={String(event.id)} /><EventActions key={String(event.id)} event={event} />
+      <EventActions key={String(event.id)} event={event} />
     </>}
   </View></Screen>;
 }

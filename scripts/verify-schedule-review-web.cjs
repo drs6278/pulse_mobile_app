@@ -70,8 +70,7 @@ async function run() {
         if (route === 'save_schedule') {
           const saved = { ...payload.p_draft, id: payload.p_id || '00000000-0000-0000-0000-000000000003', user_id: user.id, version: 1, import_id: null };
           rows = rows.filter(item => item.id !== saved.id); rows.push(saved); body = saved;
-        } else if (route === 'set_event_rsvp') { rsvps = [{ event_id: event.id, status: payload.p_status, event }]; body = payload.p_status; }
-        else if (route === 'event_attendance') body = [{ event_id: event.id, going: rsvps.filter(item => item.status === 'going').length, waitlisted: 0, capacity: null }];
+        } else if (route === 'event_rsvps') { rsvps = [{ event_id: event.id, status: payload.status, event }]; body = rsvps; }
         else if (route === 'create_schedule_source') {
           const id = '00000000-0000-0000-0000-000000000099'; body = { id, object_path: `${user.id}/${id}.csv`, label: payload.p_label, format: payload.p_format }; sources.push(body);
         } else if (route === 'schedule-source') body = payload.action === 'cleanup' ? { removed: sources.length, failed: 0 } : parseScheduleSource(fs.readFileSync('tests/fixtures/schedules/fall.csv', 'utf8'), 'csv', payload.timezone, payload.termEnd);
@@ -115,7 +114,7 @@ async function run() {
     await visit('/schedule-entry?id=00000000-0000-0000-0000-000000000002', 'Edit schedule entry');
     await waitFor('Editing a single class or commitment.'); await input('Title', 'Edited synthetic class'); await click('Save entry'); await waitFor('Your calendar');
     assert(rows.some(item => item.title === 'Edited synthetic class'), 'One-off title edit did not save');
-    await visit('/event?id=event-1', 'Synthetic campus concert'); await click('RSVP / join waitlist if full'); await waitFor('Cancel RSVP'); assert(writes.includes('set_event_rsvp'));
+    await visit('/event?id=event-1', 'Synthetic campus concert'); await click('RSVP — I’m going'); await waitFor('Cancel RSVP'); assert(writes.includes('event_rsvps'));
     await visit('/import-schedule', 'Choose ICS or CSV file'); await click('Choose ICS or CSV file'); await waitFor('Computer Science');
     assert(writes.includes('create_schedule_source') && writes.includes('storage-POST') && writes.includes('schedule-source'), 'Upload/parse missing');
     assert(!writes.includes('commit_schedule_import'), 'Import saved before review');
