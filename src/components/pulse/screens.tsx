@@ -1,12 +1,16 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PulseColors as C, PulseImages as Images } from '@/constants/pulse-theme';
+import { createEvent, defaultEventDraft, type EventDraft } from '@/lib/event-create';
 import { eventCategories } from '@/lib/event-filters';
+import { supabase } from '@/lib/supabase';
 import { useEvents } from '@/providers/events-provider';
-import { EventFeed, EventFiltersScreen, SupabaseEventScreen } from './event-browser';
+import { EventFeed, EventFiltersScreen, FilterGroup, SupabaseEventScreen } from './event-browser';
+import { Button, Field, Message } from './schedule/controls';
 import {
   EventRow, Photo, PreviewLink, PulseIcon, PulseText, Screen,
   SearchHeader, Tag, TitleHeader, usePulseScale,
@@ -88,27 +92,31 @@ export function CreateScreen() {
   return <Screen header={<SearchHeader />} bottomBar activeTab="create"><CreateContent /></Screen>;
 }
 
-function StaticField({ label }: { label: string }) {
-  const s = usePulseScale();
-  return <View accessibilityLabel={`${label}: Input, read only`} style={{ width: 210 * s, height: 56 * s, borderBottomWidth: 1, borderColor: '#49454F', paddingHorizontal: 16 * s, paddingTop: 8 * s }}>
-    <Text style={{ color: C.white, fontSize: 12 * s, letterSpacing: 0.4 * s }}>{label}</Text>
-    <Text style={{ color: C.white, fontSize: 16 * s, letterSpacing: 0.5 * s, marginTop: 2 * s }}>Input</Text>
-    <View style={{ position: 'absolute', right: 12 * s, top: 16 * s }}><PulseIcon name="clear" size={24} color={C.white} /></View>
-  </View>;
-}
-
 function CreateContent() {
   const s = usePulseScale();
-  return <View style={{ paddingTop: 27 * s, alignItems: 'center' }}>
+  const { refresh } = useEvents();
+  const [draft, setDraft] = useState(() => defaultEventDraft());
+  const [error, setError] = useState<string | null>(null), [busy, setBusy] = useState(false);
+  const change = (values: Partial<EventDraft>) => { setDraft(previous => ({ ...previous, ...values })); setError(null); };
+  async function post() {
+    setBusy(true); setError(null);
+    try {
+      const id = await createEvent(supabase, draft);
+      refresh();
+      router.replace({ pathname: '/event', params: { id } });
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to post event.'); setBusy(false); }
+  }
+  return <View style={{ padding: 16 * s, gap: 16 }}>
     <PulseText font="black" size={24} color={C.white} lineHeight={32}>Create an Event</PulseText>
-    <View style={{ marginTop: 24 * s, gap: 35 * s, transform: [{ translateX: -10 * s }] }}><StaticField label="Title" /><StaticField label="Location" /><StaticField label="Time" /></View>
-    <View style={{ marginTop: 35 * s, width: 250 * s, height: 200 * s, transform: [{ translateX: -10 * s }] }}>
-      <Text style={{ color: C.white, fontSize: 14 * s, marginLeft: 24 * s, marginTop: 18 * s }}>Select date</Text>
-      <View style={{ marginTop: 39 * s, paddingBottom: 12 * s, paddingHorizontal: 24 * s, borderBottomWidth: 1, borderColor: '#CAC4D0', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><Text style={{ color: C.white, fontSize: 32 * s }}>Enter date</Text><PulseIcon name="date" size={24} color={C.white} /></View>
-      <View style={{ marginTop: 18 * s, marginHorizontal: 24 * s, height: 56 * s, borderWidth: 3 * s, borderTopLeftRadius: 4 * s, borderTopRightRadius: 4 * s, borderColor: C.muted, paddingHorizontal: 12 * s, justifyContent: 'center' }}>
-        <Text style={{ position: 'absolute', top: -9 * s, left: 9 * s, backgroundColor: C.background, paddingHorizontal: 4 * s, color: C.muted, fontSize: 12 * s }}>Date</Text><Text style={{ color: '#1D1B20', fontSize: 16 * s }}>mm/dd/yyyy</Text>
-      </View>
-    </View>
+    <Field label="Title" value={draft.title} onChange={title => change({ title })} editable={!busy} placeholder="Pick up basketball" />
+    <Field label="Location" value={draft.location} onChange={location => change({ location })} editable={!busy} placeholder="Junker main gym" />
+    <FilterGroup title="Category" options={eventCategories} value={draft.category} onChange={category => { if (!busy) change({ category }); }} />
+    <Message text="Use local times in the timezone below." />
+    <Field label="Timezone" value={draft.timezone} onChange={value => change({ timezone: value.trim() })} editable={!busy} placeholder="America/New_York" />
+    <Field label="Start (YYYY-MM-DDTHH:mm:ss)" value={draft.start_local} onChange={start_local => change({ start_local })} editable={!busy} />
+    <Field label="End (YYYY-MM-DDTHH:mm:ss)" value={draft.end_local} onChange={end_local => change({ end_local })} editable={!busy} />
+    <Message text={error} error />
+    <Button label={busy ? 'Posting…' : 'Post event'} onPress={() => void post()} disabled={busy} />
   </View>;
 }
 
@@ -148,7 +156,7 @@ export function ScreensIndex() {
 function PreviewContent() {
   const s = usePulseScale();
   return <View style={{ padding: 20 * s, gap: 12 * s }}>
-    <PulseText font="regular" color={C.muted} style={{ marginBottom: 8 * s }}>Calendar, imports, live event RSVPs and event browsing use Supabase. Event creation, saved events and map details remain previews.</PulseText>
+    <PulseText font="regular" color={C.muted} style={{ marginBottom: 8 * s }}>Calendar, imports, live event RSVPs, event browsing and event creation use Supabase. Saved events and map details remain previews.</PulseText>
     {previews.map(([href, label]) => <PreviewLink key={href} href={href} label={label} style={{ backgroundColor: C.surface, padding: 16 * s, borderRadius: 14 * s, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><PulseText size={18}>{label}</PulseText><PulseIcon name="next" size={24} color={C.pink} /></PreviewLink>)}
   </View>;
 }

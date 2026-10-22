@@ -40,7 +40,7 @@ export function EventFeed() {
   </View>;
 }
 
-function FilterGroup<T extends string>({ title, options, value, onChange }: { title: string; options: readonly T[]; value: T; onChange: (value: T) => void }) {
+export function FilterGroup<T extends string>({ title, options, value, onChange }: { title: string; options: readonly T[]; value: T; onChange: (value: T) => void }) {
   const s = usePulseScale();
   return <View style={{ gap: 12 * s }}><PulseText size={32}>{title}</PulseText><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 * s }}>
     {options.map(option => <Pressable key={option} accessibilityRole="radio" accessibilityLabel={`${title}: ${option}`} accessibilityState={{ checked: value === option }} onPress={() => onChange(option)} style={{ minHeight: 44, minWidth: 80 * s, paddingHorizontal: 14 * s, paddingVertical: 10 * s, borderRadius: 25 * s, borderWidth: 2, borderColor: value === option ? C.pink : C.muted, backgroundColor: value === option ? C.pink : 'transparent', alignItems: 'center', justifyContent: 'center' }}><PulseText size={14} color={value === option ? C.white : C.muted}>{option}</PulseText></Pressable>)}

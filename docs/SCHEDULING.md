@@ -17,6 +17,17 @@ Client row/domain interfaces describe this migration contract. They are **not ge
 
 For read-only public API introspection, `npm run inspect:backend` prints only exposed schema definitions, never credentials or row data. The configured server may reject that endpoint with “Secret API key required”; use the SQL preflight instead. Do not substitute a secret into the app environment.
 
+## Event creation
+
+The Create tab lets signed-in students post events. Apply `supabase/migrations/202610210001_event_creation.sql` **after** the scheduling migration, again via a staging copy first. It:
+
+- adds `events.created_by` (defaults to `auth.uid()`),
+- gives `events.id` a server-side generator only when it has no default or identity,
+- grants `authenticated` column-level INSERT on title, location, category, date and `pulse_*` time fields only, so clients cannot pick IDs, owners, revisions or cancellation,
+- adds an `event_insert_own` policy requiring `created_by = auth.uid()`.
+
+Before applying, check the preflight's `events` columns for other NOT NULL columns without defaults; the app does not supply them and inserts would fail. The form takes local `YYYY-MM-DDTHH:mm:ss` times plus an IANA timezone, and the app stores UTC `pulse_starts_at`/`pulse_ends_at`, `pulse_timezone`, and the local start date as `event_date`. Editing and cancelling posted events are not supported yet. Until the migration is applied, posting shows a setup message.
+
 ## Data model and flows
 
 - `schedule_series`: private single or weekly class/commitment definitions, local wall times, IANA zone, bounded semester, source UID, normalized content key, and optimistic version.
