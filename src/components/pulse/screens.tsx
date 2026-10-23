@@ -10,6 +10,7 @@ import { eventCategories } from '@/lib/event-filters';
 import { supabase } from '@/lib/supabase';
 import { useEvents } from '@/providers/events-provider';
 import { EventFeed, EventFiltersScreen, FilterGroup, SupabaseEventScreen } from './event-browser';
+import { EventDateTimeFields } from './event-date-time-fields';
 import { Button, Field, Message } from './schedule/controls';
 import {
   EventRow, Photo, PreviewLink, PulseIcon, PulseText, Screen,
@@ -111,10 +112,8 @@ function CreateContent() {
     <Field label="Title" value={draft.title} onChange={title => change({ title })} editable={!busy} placeholder="Pick up basketball" />
     <Field label="Location" value={draft.location} onChange={location => change({ location })} editable={!busy} placeholder="Junker main gym" />
     <FilterGroup title="Category" options={eventCategories} value={draft.category} onChange={category => { if (!busy) change({ category }); }} />
-    <Message text="Use local times in the timezone below." />
-    <Field label="Timezone" value={draft.timezone} onChange={value => change({ timezone: value.trim() })} editable={!busy} placeholder="America/New_York" />
-    <Field label="Start (YYYY-MM-DDTHH:mm:ss)" value={draft.start_local} onChange={start_local => change({ start_local })} editable={!busy} />
-    <Field label="End (YYYY-MM-DDTHH:mm:ss)" value={draft.end_local} onChange={end_local => change({ end_local })} editable={!busy} />
+    <EventDateTimeFields draft={draft} disabled={busy} onChange={change} />
+    <View style={{ gap: 12 }}><PulseText size={18}>Age eligibility</PulseText><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>{([0, 18, 21] as const).map(age => <Pressable key={age} accessibilityRole="radio" accessibilityLabel={age ? `${age} and older` : 'All ages'} accessibilityState={{ checked: (draft.age_min ?? 0) === age, disabled: busy }} disabled={busy} onPress={() => change({ age_min: age })} style={{ minWidth: 70, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: (draft.age_min ?? 0) === age ? C.pink : C.muted, padding: 12, justifyContent: 'center', alignItems: 'center' }}><PulseText size={14}>{age ? `${age}+` : 'All ages'}</PulseText></Pressable>)}</View><PulseText size={14}>Age eligibility is self-reported, not verified identification.</PulseText></View>
     <Message text={error} error />
     <Button label={busy ? 'Posting…' : 'Post event'} onPress={() => void post()} disabled={busy} />
   </View>;
@@ -146,7 +145,7 @@ const previews = [
   ['/', 'Home Dashboard'], ['/categories', 'Browse Categories'], ['/filters', 'Filter & Sort'],
   ['/search', 'Search Results'], ['/saved', 'Saved Events'], ['/event', 'Event Details'],
   ['/create', 'Create Event'], ['/import-schedule', 'Import Schedule'], ['/map', 'Map'], ['/calendar', 'Calendar'],
-  ['/settings', 'Settings'],
+  ['/profile', 'My profile'], ['/settings', 'Account settings'],
 ] as const;
 
 export function ScreensIndex() {

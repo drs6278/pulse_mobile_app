@@ -1,11 +1,20 @@
 import { describe, expect, jest, test } from '@jest/globals';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { createEvent, eventCreateError, eventRow, validateEventDraft, type EventDraft } from '../event-create';
+import { createEvent, eventCreateError, eventRow, moveEventStart, validateEventDraft, type EventDraft } from '../event-create';
 
 const now = Date.parse('2026-10-21T12:00:00Z');
 const draft: EventDraft = { title: 'Pick up basketball', location: 'Junker', category: 'Sports', timezone: 'America/New_York', start_local: '2026-11-02T17:00:00', end_local: '2026-11-02T19:00:00' };
 
 describe('event creation', () => {
+  test('moving the start preserves duration across midnight', () => {
+    expect(moveEventStart(draft, '2026-11-03T23:30:00')).toEqual({ start_local: '2026-11-03T23:30:00', end_local: '2026-11-04T01:30:00' });
+  });
+  test('preserves elapsed duration across daylight saving', () => {
+    expect(moveEventStart(draft, '2027-03-14T01:30:00').end_local).toBe('2027-03-14T04:30:00');
+  });
+  test('keeps skipped daylight-saving times available for validation', () => {
+    expect(moveEventStart(draft, '2027-03-14T02:30:00')).toEqual({ start_local: '2027-03-14T02:30:00' });
+  });
   test('accepts a valid future event', () => {
     expect(validateEventDraft(draft, now)).toEqual([]);
   });
@@ -21,7 +30,7 @@ describe('event creation', () => {
   test('stores UTC instants with the entered zone and local date', () => {
     expect(eventRow({ ...draft, title: ' Hoops ' })).toEqual({
       title: 'Hoops', location: 'Junker', category: 'Sports', event_date: '2026-11-02',
-      pulse_starts_at: '2026-11-02T22:00:00.000Z', pulse_ends_at: '2026-11-03T00:00:00.000Z', pulse_timezone: 'America/New_York',
+      pulse_starts_at: '2026-11-02T22:00:00.000Z', pulse_ends_at: '2026-11-03T00:00:00.000Z', pulse_timezone: 'America/New_York', pulse_age_min: 0,
     });
   });
   test('inserts without choosing an ID or owner', async () => {

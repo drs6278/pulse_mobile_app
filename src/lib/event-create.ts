@@ -11,11 +11,20 @@ export type EventDraft = {
   timezone: string;
   start_local: string;
   end_local: string;
+  age_min?: 0 | 18 | 21;
 };
 
 export function defaultEventDraft(timezone = defaultPreferences().timezone): EventDraft {
   const start = DateTime.now().setZone(timezone).startOf('hour').plus({ hours: 1 });
   return { title: '', location: '', category: 'Other', timezone, start_local: toLocal(start), end_local: toLocal(start.plus({ hours: 1 })) };
+}
+
+export function moveEventStart(draft: EventDraft, start_local: string): Partial<EventDraft> {
+  const previous = wallTime(draft.start_local, draft.timezone), end = wallTime(draft.end_local, draft.timezone);
+  const start = wallTime(start_local, draft.timezone);
+  if (!start) return { start_local };
+  const duration = previous && end && end > previous ? end.diff(previous).toMillis() : 60 * 60 * 1000;
+  return { start_local, end_local: toLocal(start.plus({ milliseconds: duration })) };
 }
 
 export function validateEventDraft(draft: EventDraft, now = Date.now()): string[] {
@@ -24,6 +33,7 @@ export function validateEventDraft(draft: EventDraft, now = Date.now()): string[
   // Mirrors the hosted events_location_check constraint.
   if (!draft.location.trim() || draft.location.trim().length > 300) errors.push('Location must contain 1–300 characters.');
   if (!eventCategories.includes(draft.category)) errors.push('Choose a category.');
+  if (![0, 18, 21].includes(draft.age_min ?? 0)) errors.push('Choose a valid age restriction.');
   if (!validZone(draft.timezone)) errors.push('Choose a valid IANA timezone, such as America/New_York.');
   const start = wallTime(draft.start_local, draft.timezone), end = wallTime(draft.end_local, draft.timezone);
   if (!start || !end) errors.push('Enter valid local dates and times. Times skipped by daylight saving are invalid.');
@@ -44,6 +54,7 @@ export function eventRow(draft: EventDraft) {
     pulse_starts_at: start.toUTC().toISO()!,
     pulse_ends_at: end.toUTC().toISO()!,
     pulse_timezone: draft.timezone,
+    pulse_age_min: draft.age_min ?? 0,
   };
 }
 

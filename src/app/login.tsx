@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { PulseText } from '@/components/pulse/ui';
 import { PulseColors as C, PulseFonts } from '@/constants/pulse-theme';
@@ -18,6 +19,7 @@ import { useAuth } from '@/providers/auth-provider';
 type Mode = 'signIn' | 'signUp';
 
 export default function LoginScreen() {
+  const params = useLocalSearchParams<{ returnTo?: string; notice?: string }>();
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<Mode>('signIn');
   const [email, setEmail] = useState('');
@@ -49,7 +51,9 @@ export default function LoginScreen() {
       setError(result.error);
       if (result.needsConfirmation) setNotice('Check your email to confirm your account, then sign in.');
     } else {
-      setError((await signIn(trimmedEmail, password)).error);
+      const result = await signIn(trimmedEmail, password);
+      setError(result.error);
+      if (!result.error && params.returnTo === 'delete-account') router.replace('/delete-account');
     }
     setSubmitting(false);
   };
@@ -63,6 +67,7 @@ export default function LoginScreen() {
         </PulseText>
 
         <View style={styles.form}>
+          {params.notice === 'deletion-requested' && <PulseText size={14} color={C.text}>Your account is locked and deletion has been requested. Deletion normally completes within 24 hours.</PulseText>}
           <TextInput
             style={styles.input}
             value={email}

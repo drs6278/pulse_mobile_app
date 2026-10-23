@@ -36,6 +36,7 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
   }, [ready]);
   if (!ready) return <View style={{ flex: 1, backgroundColor: PulseColors.background }} />;
   return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: PulseColors.background }, animation: 'none' }}>
+    <Stack.Screen name="account-deletion" />
     <Stack.Protected guard={!!session}>
       <Stack.Screen name="(app)" />
     </Stack.Protected>

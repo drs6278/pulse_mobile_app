@@ -7,6 +7,8 @@ export type PulseEvent = {
   event_date: string;
   location: string;
   category: string;
+  created_by?: string | null;
+  pulse_age_min?: number;
   pulse_starts_at?: string | null;
   pulse_ends_at?: string | null;
   pulse_timezone?: string | null;
@@ -17,7 +19,7 @@ export type PulseEvent = {
 };
 // PostgREST casts avoid losing precision when an existing backend uses bigint IDs.
 export const eventColumns = 'id::text,title,event_date,location,category';
-export const eventDetailsColumns = `${eventColumns},pulse_starts_at,pulse_ends_at,pulse_timezone,pulse_cancelled,pulse_revision,pulse_all_day_start,pulse_all_day_end`;
+export const eventDetailsColumns = `${eventColumns},pulse_starts_at,pulse_ends_at,pulse_timezone,pulse_cancelled,pulse_revision,pulse_all_day_start,pulse_all_day_end,created_by,pulse_age_min`;
 export const EVENTS_PER_PAGE = 20;
 
 export function eventInterval(event: PulseEvent) {

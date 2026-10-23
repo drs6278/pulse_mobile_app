@@ -83,12 +83,12 @@ export function PreviewLink({ href, label, children, style }: {
 
 export function BackButton({ close = false }: { close?: boolean }) {
   const s = usePulseScale();
-  return <Pressable accessibilityRole="button" accessibilityLabel={close ? 'Close screen' : 'Go back'} onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={{ width: 50 * s, height: 50 * s, alignItems: 'center', justifyContent: 'center' }}><PulseIcon name={close ? 'close' : 'back'} size={48} /></Pressable>;
+  return <Pressable accessibilityRole="button" accessibilityLabel={close ? 'Close screen' : 'Go back'} onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={{ width: 50 * s, height: 50 * s, minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' }}><PulseIcon name={close ? 'close' : 'back'} size={48} /></Pressable>;
 }
 
 export function TitleHeader({ title, close, right }: { title: string; close?: boolean; right?: ReactNode }) {
   const s = usePulseScale();
-  return <View style={{ height: 75 * s, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10 * s, gap: (close ? 13 : 4) * s }}><BackButton close={close} /><PulseText size={24} color={C.white} style={{ flex: 1, transform: close ? [{ translateY: 3 * s }] : undefined }} lineHeight={32}>{title}</PulseText>{right}</View>;
+  return <View style={{ minHeight: 75 * s, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10 * s, gap: (close ? 13 : 4) * s }}><BackButton close={close} /><PulseText size={24} color={C.white} style={{ flex: 1, transform: close ? [{ translateY: 3 * s }] : undefined }} lineHeight={32}>{title}</PulseText>{right}</View>;
 }
 
 export function SearchHeader({ query = 'search', home = false }: { query?: string; home?: boolean }) {
@@ -100,7 +100,7 @@ export function SearchHeader({ query = 'search', home = false }: { query?: strin
       <TextInput accessibilityLabel="Search events by title" value={titleSearch} placeholder={query} placeholderTextColor={C.muted} returnKeyType="search" autoCorrect={false} onChangeText={setTitleSearch} style={{ flex: 1, color: C.white, fontSize: 16 * s, letterSpacing: 0.5 * s, paddingVertical: 0 }} />
       <PulseIcon name="search" size={24} />
     </View>
-    <PreviewLink href="/screens" label="Browse all screen previews"><PulseIcon name="account" /></PreviewLink>
+    <PreviewLink href="/profile" label="My profile" style={{ minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' }}><PulseIcon name="account" /></PreviewLink>
   </View>;
 }
 
