@@ -7,6 +7,7 @@ describe('profile validation and atomic saves', () => {
   test('validates Unicode length, blank names, control characters, and age bands', () => {
     expect(validateProfile({ display_name: '  ', bio: '', age_band: 'unknown' })).toHaveProperty('display_name');
     expect(validateProfile({ display_name: 'Alice\nAdmin', bio: '', age_band: 'unknown' })).toHaveProperty('display_name');
+    expect(validateProfile({ display_name: 'Alice', bio: '', age_band: null })).toHaveProperty('age_band');
     expect(validateProfile({ display_name: '😀'.repeat(60), bio: '😀'.repeat(280), age_band: '21_plus' })).toEqual({});
     expect(validateProfile({ display_name: 'A', bio: '😀'.repeat(281), age_band: '21_plus' })).toHaveProperty('bio');
     expect(profileInitials('  Jane  Doe ')).toBe('JD');

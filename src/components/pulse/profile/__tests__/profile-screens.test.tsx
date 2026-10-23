@@ -3,6 +3,8 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import type { OwnProfile } from '@/lib/profile/types';
 import { MyProfileScreen } from '../my-profile-screen';
 import { ProfileEditor } from '../edit-profile-screen';
+import { ProfileForm } from '../profile-form';
+import { AccountBoundary } from '../account-boundary';
 import { ChangePasswordScreen, DeleteAccountScreen } from '../security-screens';
 
 const mockReplace = jest.fn(), mockRefresh = jest.fn(), mockPreventRemove = jest.fn();
@@ -10,8 +12,11 @@ const mockSave = jest.fn<(...args: unknown[]) => Promise<void>>(), mockInvoke = 
 const mockLoad = jest.fn<(...args: unknown[]) => Promise<OwnProfile>>();
 const mockUpdatePassword = jest.fn<(...args: unknown[]) => Promise<{ error: null | { message: string; code: string } }>>();
 const mockReauth = jest.fn<() => Promise<{ error: null }>>();
-const initial: OwnProfile = { public: { user_id: 'alice', display_name: 'Alice', bio: 'Hello campus', avatar_path: null, version: 7, updated_at: '2026-01-01' }, private: { user_id: 'alice', age_band: '21_plus', account_state: 'active', profile_hidden: false, created_at: '2026-01-01' } };
-const mockResource = { userId: 'alice', loading: false, error: null as string | null, data: initial, refresh: mockRefresh, mutate: async (fn: (user: string) => Promise<unknown>) => fn('alice') };
+const initial: OwnProfile = { public: { user_id: 'alice', display_name: 'Alice', bio: 'Hello campus', avatar_path: null, version: 7, updated_at: '2026-01-01' }, private: { user_id: 'alice', age_band: '21_plus', account_state: 'active', profile_hidden: false, profile_setup_completed_at: '2026-01-01', created_at: '2026-01-01' } };
+const unfinished: OwnProfile = { public: { ...initial.public!, display_name: '', bio: '', version: 1 }, private: { ...initial.private, age_band: 'unknown', profile_setup_completed_at: null } };
+const mockMutate = jest.fn<(fn: (user: string) => Promise<unknown>, options?: { completeSetup: boolean }) => Promise<unknown>>();
+const mockResource = { userId: 'alice', loading: false, error: null as string | null, data: initial as OwnProfile | null, refresh: mockRefresh, mutate: mockMutate };
+let mockPathname = '/';
 const mockSignOut = jest.fn<() => Promise<{ error: null }>>();
 jest.mock('@/providers/auth-provider', () => ({ useAuth: () => ({ session: { user: { id: 'alice', email: 'private@example.invalid' }, access_token: 'original-token' }, signOut: mockSignOut }) }));
 jest.mock('@/providers/profile-provider', () => ({ useProfile: () => mockResource }));
@@ -21,7 +26,7 @@ jest.mock('@/hooks/use-user-resource', () => ({ useUserResource: () => ({ loadin
 jest.mock('@/lib/profile/pick-avatar', () => ({ pickAvatar: async () => null }));
 jest.mock('@/lib/profile/repository', () => ({ saveProfile: (...args: unknown[]) => mockSave(...args), loadOwnProfile: (...args: unknown[]) => mockLoad(...args), invokeProfileFunction: (...args: unknown[]) => mockInvoke(...args), profileSessionClient: () => ({ original: true }), profileError: (value: { message: string }) => value.message }));
 jest.mock('@/lib/supabase', () => ({ supabase: { auth: { updateUser: (...args: unknown[]) => mockUpdatePassword(...args), reauthenticate: () => mockReauth(), signOut: () => mockSignOut() } } }));
-jest.mock('expo-router', () => ({ router: { replace: (...args: unknown[]) => mockReplace(...args) }, useNavigation: () => ({ dispatch: jest.fn() }), useFocusEffect: () => {} }));
+jest.mock('expo-router', () => ({ router: { replace: (...args: unknown[]) => mockReplace(...args) }, useNavigation: () => ({ dispatch: jest.fn() }), useFocusEffect: () => {}, usePathname: () => mockPathname }));
 jest.mock('expo-router/react-navigation', () => ({ usePreventRemove: (...args: unknown[]) => mockPreventRemove(...args) }));
 jest.mock('../../ui', () => {
   const { View, Text } = jest.requireActual<typeof import('react-native')>('react-native');
@@ -43,6 +48,86 @@ beforeEach(() => {
   mockLoad.mockReset().mockResolvedValue({ ...initial, public: { ...initial.public!, display_name: 'Latest Alice', version: 8 } });
   mockUpdatePassword.mockReset().mockResolvedValue({ error: null }); mockReauth.mockReset().mockResolvedValue({ error: null });
   mockResource.error = null;
+  mockResource.data = initial; mockResource.loading = false; mockPathname = '/';
+  mockMutate.mockReset().mockImplementation(async fn => fn('alice'));
+});
+
+test('setup starts blank and requires an explicit age choice, including prefer not to say', async () => {
+  const screen = render(<ProfileForm initial={unfinished} setup />);
+  expect(screen.getByLabelText('Display name').props.value).toBe('');
+  fireEvent.press(screen.getByLabelText('Finish setup'));
+  expect(mockSave).not.toHaveBeenCalled();
+  expect(screen.getByText('Choose an age eligibility option.')).toBeTruthy();
+  fireEvent.changeText(screen.getByLabelText('Display name'), 'New Alice');
+  fireEvent.press(screen.getByLabelText('Finish setup'));
+  expect(mockSave).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByLabelText('Prefer not to say'));
+  fireEvent.press(screen.getByLabelText('Finish setup'));
+  await waitFor(() => expect(mockSave).toHaveBeenCalledWith(expect.anything(), { display_name: 'New Alice', bio: '', age_band: 'unknown' }, 1, undefined));
+  expect(mockMutate).toHaveBeenCalledWith(expect.any(Function), { completeSetup: true });
+  expect(mockPreventRemove).not.toHaveBeenCalled();
+  expect(mockReplace).not.toHaveBeenCalledWith('/profile');
+});
+
+test('setup keeps drafts on write failure and retries only verification after a committed save', async () => {
+  mockSave.mockRejectedValueOnce(new Error('Save offline'));
+  mockMutate.mockImplementationOnce(async fn => fn('alice'))
+    .mockImplementationOnce(async fn => { await fn('alice'); throw new Error('Read offline'); });
+  const screen = render(<ProfileForm initial={unfinished} setup />);
+  fireEvent.changeText(screen.getByLabelText('Display name'), 'New Alice');
+  fireEvent.press(screen.getByLabelText('18–20'));
+  fireEvent.press(screen.getByLabelText('Finish setup'));
+  await waitFor(() => expect(screen.getByText('Save offline')).toBeTruthy());
+  expect(screen.getByLabelText('Display name').props.value).toBe('New Alice');
+  fireEvent.press(screen.getByLabelText('Finish setup'));
+  await waitFor(() => expect(screen.getByText('Read offline')).toBeTruthy());
+  expect(screen.getByLabelText('Display name').props.editable).toBe(false);
+  fireEvent.press(screen.getByLabelText('Retry profile check'));
+  await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(3));
+  expect(mockSave).toHaveBeenCalledTimes(2);
+});
+
+test('incomplete accounts cannot mount app screens through deep links or back navigation', () => {
+  mockResource.data = unfinished;
+  const child = <ProfileEditor initial={initial} />;
+  const screen = render(<AccountBoundary>{child}</AccountBoundary>);
+  expect(screen.getByText(/Choose a display name/)).toBeTruthy();
+  expect(screen.queryByLabelText('Save profile')).toBeNull();
+  expect(screen.getByLabelText('Sign out')).toBeTruthy();
+  mockPathname = '/calendar';
+  screen.rerender(<AccountBoundary>{child}</AccountBoundary>);
+  expect(screen.getByLabelText('Finish setup')).toBeTruthy();
+  mockResource.data = initial;
+  screen.rerender(<AccountBoundary>{child}</AccountBoundary>);
+  expect(screen.getByLabelText('Save profile')).toBeTruthy();
+  expect(mockReplace).toHaveBeenCalledWith('/');
+});
+
+test('incomplete accounts can delete their account and sign out without completing setup', async () => {
+  mockResource.data = unfinished;
+  const screen = render(<AccountBoundary>App content</AccountBoundary>);
+  fireEvent.press(screen.getByLabelText('Sign out'));
+  await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
+  mockPathname = '/delete-account';
+  screen.rerender(<AccountBoundary>App content</AccountBoundary>);
+  expect(screen.getByText('Permanently leave Pulse?')).toBeTruthy();
+  expect(screen.queryByLabelText('Finish setup')).toBeNull();
+});
+
+test('profile loading failures, suspension, and deletion cannot expose app screens', () => {
+  mockResource.data = null; mockResource.loading = true;
+  const screen = render(<AccountBoundary>Private app content</AccountBoundary>);
+  expect(screen.queryByText('Private app content')).toBeNull();
+  mockResource.loading = false; mockResource.error = 'Offline';
+  screen.rerender(<AccountBoundary>Private app content</AccountBoundary>);
+  expect(screen.getByText('Offline')).toBeTruthy();
+  for (const state of ['suspended', 'deleting'] as const) {
+    mockResource.error = null;
+    mockResource.data = { ...unfinished, private: { ...unfinished.private, account_state: state } };
+    screen.rerender(<AccountBoundary>Private app content</AccountBoundary>);
+    expect(screen.queryByText('Private app content')).toBeNull();
+    expect(screen.queryByLabelText('Finish setup')).toBeNull();
+  }
 });
 test('private hub shows private email and age without putting them in the public profile link', () => {
   const screen = render(<MyProfileScreen />);

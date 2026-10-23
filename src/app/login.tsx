@@ -37,7 +37,8 @@ export default function LoginScreen() {
   };
 
   // On success there's nothing to navigate: the session changes and the
-  // root layout's Stack.Protected guard swaps this screen for the app.
+  // root layout swaps this screen for the account boundary, which requires
+  // profile setup before allowing access to the app.
   const submit = async () => {
     const trimmedEmail = email.trim();
     if (!trimmedEmail) return setError('Enter your email.');

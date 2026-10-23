@@ -6,6 +6,9 @@ process.on('uncaughtException', error => { console.error(error.message, error.qu
 // Disposable database only. No environment credentials or hosted mutations.
 const read = name => fs.readFile(new URL(`../supabase/migrations/${name}.sql`, import.meta.url), 'utf8');
 const migrations = await Promise.all(['202610190001_scheduling', '202610210001_event_creation', '202610210003_schedule_review', '202610230001_profiles'].map(read));
+const setupMigration = await read('202610230002_profile_setup');
+const preflight = await fs.readFile(new URL('../supabase/preflight.sql', import.meta.url), 'utf8');
+const postflight = await fs.readFile(new URL('../supabase/profile-postflight.sql', import.meta.url), 'utf8');
 const alice = '00000000-0000-0000-0000-000000000001', bob = '00000000-0000-0000-0000-000000000002', carol = '00000000-0000-0000-0000-000000000003';
 for (const type of ['uuid', 'bigint', 'text']) {
   const db = new PGlite();
@@ -32,22 +35,74 @@ for (const type of ['uuid', 'bigint', 'text']) {
       grant select,insert,delete on storage.objects to authenticated;
       grant all on storage.objects to service_role;
     `);
+    await db.exec(preflight);
+    await assert.rejects(db.exec(postflight), /Missing table or RLS/);
     for (const migration of migrations) await db.exec(migration);
+    // Exercise the upgrade against both untouched and customized legacy users.
+    const legacyUsers = [4, 5, 6, 7].map(value => `00000000-0000-0000-0000-${String(value).padStart(12, '0')}`);
+    for (const user of legacyUsers) await db.query('insert into auth.users values($1)', [user]);
+    await db.query("update public.profiles set display_name='Custom name' where user_id=$1", [legacyUsers[0]]);
+    await db.query("update public.profiles set bio='Custom bio' where user_id=$1", [legacyUsers[1]]);
+    await db.query("update public.profiles set avatar_path='existing/photo.jpg' where user_id=$1", [legacyUsers[2]]);
+    await db.query("update public.private_profiles set age_band='18_to_20' where user_id=$1", [legacyUsers[3]]);
+    await db.query('update public.profiles set version=2 where user_id=$1', [bob]);
+    await db.exec(setupMigration);
+    for (const user of [bob, ...legacyUsers]) {
+      assert.ok((await db.query('select profile_setup_completed_at from public.private_profiles where user_id=$1', [user])).rows[0].profile_setup_completed_at, 'customized profiles stay complete');
+    }
+    assert.equal((await db.query('select display_name from public.profiles where user_id=$1', [bob])).rows[0].display_name, 'Pulse student', 'deliberately saved names are preserved');
+    for (const user of legacyUsers) await db.query('delete from auth.users where id=$1', [user]);
+    assert.equal((await db.query('select display_name from public.profiles where user_id=$1', [alice])).rows[0].display_name, '', 'untouched generated names are cleared');
+    assert.equal((await db.query('select profile_setup_completed_at from public.private_profiles where user_id=$1', [alice])).rows[0].profile_setup_completed_at, null);
+    await db.exec(preflight);
+    await db.exec(postflight);
+    // Recovery checks must reject incomplete installs without changing data.
+    for (const [damage, expected] of [
+      [`delete from public.profiles where user_id='${alice}'`, /missing public\/private profile backfill/],
+      ['alter table auth.users disable trigger provision_profile', /Missing or disabled Auth profile provisioning trigger/],
+      ['revoke select on public.private_profiles from authenticated', /Unexpected profile read\/write grants/],
+    ]) {
+      await db.exec(`begin; ${damage}`);
+      await assert.rejects(db.exec(postflight), expected);
+      await db.exec('rollback');
+    }
+    await db.exec(postflight);
     assert.equal(await count('profiles'), 2, 'existing users are backfilled');
     await db.query('insert into auth.users values($1)', [carol]);
     assert.equal(await count('profiles'), 3, 'new users are provisioned by trigger');
+    assert.equal((await db.query('select display_name from public.profiles where user_id=$1', [carol])).rows[0].display_name, '', 'signup does not invent a name');
+    assert.equal((await db.query('select profile_setup_completed_at from public.private_profiles where user_id=$1', [carol])).rows[0].profile_setup_completed_at, null);
+    await identity(bob);
+    assert.equal(await count('profiles'), 1, 'incomplete profiles are hidden from other users');
+    await identity(carol);
+    assert.equal((await db.query('select user_id from public.profiles where user_id=$1', [carol])).rows.length, 1, 'owner can load their incomplete profile');
+    await assert.rejects(save('  ', '', 'unknown'), /1–60/);
+    await assert.rejects(save('Carol', '', null), /Choose an age/);
+    await assert.rejects(save('Carol', 'a'.repeat(281), 'unknown'), /check constraint/);
+    await assert.rejects(save('Carol', '', 'unknown', 999), /changed/);
+    assert.equal((await db.query('select profile_setup_completed_at from public.private_profiles where user_id=$1', [carol])).rows[0].profile_setup_completed_at, null, 'failed setup never marks completion');
+    await save('Carol', '', 'unknown');
+    const completedAt = (await db.query('select profile_setup_completed_at from public.private_profiles where user_id=$1', [carol])).rows[0].profile_setup_completed_at;
+    assert.ok(completedAt, 'explicit prefer not to say completes setup');
+    await save('Carol updated', '', 'unknown', 2);
+    assert.equal(String((await db.query('select profile_setup_completed_at from public.private_profiles where user_id=$1', [carol])).rows[0].profile_setup_completed_at), String(completedAt), 'normal edits preserve completion time');
+    await db.exec('reset role');
     const eventId = type === 'uuid' ? '00000000-0000-0000-0000-000000000010' : type === 'bigint' ? '10' : 'event-10';
     await db.query('insert into public.events(id,title,event_date,created_by,pulse_age_min) values($1,$2,$3,$4,21)', [eventId, '21+ concert', '2026-11-01', bob]);
+    await identity(carol);
+    assert.equal(await count('events'), 0, 'explicit prefer not to say does not unlock age-restricted events');
     await identity(alice);
     assert.equal(await count('profiles'), 3);
     assert.equal(await count('private_profiles'), 1);
     assert.equal(await count('events'), 0, 'unknown age cannot read restricted events');
     await assert.rejects(db.query('update public.profiles set display_name=$1 where user_id=$2', ['Spoof', bob]), /permission denied/);
     await assert.rejects(db.query("update public.private_profiles set account_state='active'"), /permission denied/);
+    await assert.rejects(db.query('update public.private_profiles set profile_setup_completed_at=now()'), /permission denied/);
     await assert.rejects(save('Alice', '', '21_plus', 999), /changed/);
-    await assert.rejects(save('Alice', '', 'bad_age'), /check constraint/);
+    await assert.rejects(save('Alice', '', 'bad_age'), /Choose an age/);
     assert.equal((await db.query('select version from public.profiles where user_id=$1', [alice])).rows[0].version, 1, 'invalid age rolls back public update');
     await save(' Alice ', ' A bio ', '21_plus');
+    assert.ok((await db.query('select profile_setup_completed_at from public.private_profiles where user_id=$1', [alice])).rows[0].profile_setup_completed_at);
     assert.equal(await count('events'), 1);
     await db.query("insert into public.event_rsvps(user_id,event_id,status) values($1,$2,'going')", [alice, eventId]);
     await db.query('select public.set_user_block($1,true)', [bob]);

@@ -18,7 +18,7 @@ export function profileError(reason: unknown): string {
 }
 export async function loadOwnProfile(client: SupabaseClient, user: string, signal: AbortSignal): Promise<OwnProfile> {
   const [privateResult, publicResult] = await Promise.all([
-    client.from('private_profiles').select('user_id,age_band,account_state,profile_hidden,created_at').eq('user_id', user).abortSignal(signal).single<PrivateProfile>(),
+    client.from('private_profiles').select('user_id,age_band,account_state,profile_hidden,profile_setup_completed_at,created_at').eq('user_id', user).abortSignal(signal).single<PrivateProfile>(),
     client.from('profiles').select(publicProfileColumns).eq('user_id', user).abortSignal(signal).maybeSingle<PublicProfile>(),
   ]);
   if (privateResult.error) throw new Error(profileError(privateResult.error));
