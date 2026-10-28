@@ -15,6 +15,7 @@ export function MyProfileScreen() {
     {loading ? <ProfileLoading /> : error ? <><ProfileMessage text={error} error /><ProfileButton label="Try again" onPress={refresh} /></> : data?.public && <>
       <View style={S.card}><ProfileAvatar name={data.public.display_name} path={data.public.avatar_path} /><ProfileText title>{data.public.display_name}</ProfileText><ProfileText muted>{data.public.bio || 'Add a short bio to introduce yourself.'}</ProfileText>
         {data.private.profile_hidden && <ProfileMessage text="Your student profile is hidden by moderation. Account settings remain available." />}
+        <ProfileLink href="/my-events" label="My posted events" detail="View and edit your upcoming events" />
         <ProfileLink href="/edit-profile" label="Edit profile" detail="Photo, name, bio, and private age eligibility" />
         {!data.private.profile_hidden && <ProfileLink href={{ pathname: '/student-profile', params: { id: data.public.user_id } }} label="View student profile" detail="See what other signed-in students can see" />}
       </View>

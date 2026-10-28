@@ -1,3 +1,4 @@
+import { useNotifications } from '@/providers/notifications-provider';
 import { Image, type ImageSource } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, router, type Href } from 'expo-router';
@@ -26,6 +27,7 @@ const clientSnapshot = () => true;
 const serverSnapshot = () => false;
 
 const icons = {
+  bell: require('@/assets/figma/bell.svg'),
   filter: require('@/assets/figma/filter.svg'),
   account: require('@/assets/figma/account.svg'),
   home: require('@/assets/figma/home.svg'),
@@ -91,15 +93,17 @@ export function TitleHeader({ title, close, right }: { title: string; close?: bo
   return <View style={{ minHeight: 75 * s, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10 * s, gap: (close ? 13 : 4) * s }}><BackButton close={close} /><PulseText size={24} color={C.white} style={{ flex: 1, transform: close ? [{ translateY: 3 * s }] : undefined }} lineHeight={32}>{title}</PulseText>{right}</View>;
 }
 
-export function SearchHeader({ query = 'search', home = false }: { query?: string; home?: boolean }) {
+export function SearchHeader({ query = 'search' }: { query?: string; home?: boolean }) {
   const s = usePulseScale();
   const { titleSearch, setTitleSearch } = useEvents();
-  return <View style={{ height: 75 * s, backgroundColor: C.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10 * s, gap: 18 * s }}>
-    <PreviewLink href="/filters" label="Filter and sort" style={home ? { transform: [{ translateX: 18 * s }] } : undefined}><PulseIcon name="filter" /></PreviewLink>
+  const { unread } = useNotifications();
+  return <View style={{ height: 75 * s, backgroundColor: C.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10 * s, gap: 6 * s }}>
+    <PreviewLink href="/filters" label="Filter and sort"><PulseIcon name="filter" /></PreviewLink>
     <View style={{ flex: 1, height: 50 * s, borderRadius: 28 * s, backgroundColor: C.search, paddingLeft: 24 * s, paddingRight: 16 * s, flexDirection: 'row', alignItems: 'center', gap: 8 * s }}>
       <TextInput accessibilityLabel="Search events by title" value={titleSearch} placeholder={query} placeholderTextColor={C.muted} returnKeyType="search" autoCorrect={false} onChangeText={setTitleSearch} style={{ flex: 1, color: C.white, fontSize: 16 * s, letterSpacing: 0.5 * s, paddingVertical: 0 }} />
       <PulseIcon name="search" size={24} />
     </View>
+    <PreviewLink href="/notifications" label={`Notifications, ${unread} unread`} style={{ minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' }}><PulseIcon name="bell" size={28} />{unread > 0 && <View style={{ position: 'absolute', right: 0, top: 0, backgroundColor: C.pink, borderRadius: 12, paddingHorizontal: 5, minWidth: 20, alignItems: 'center' }}><PulseText size={12} color={C.white}>{unread > 99 ? '99+' : unread}</PulseText></View>}</PreviewLink>
     <PreviewLink href="/profile" label="My profile" style={{ minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' }}><PulseIcon name="account" /></PreviewLink>
   </View>;
 }

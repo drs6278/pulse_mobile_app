@@ -109,14 +109,21 @@ function CreateContent() {
   }
   return <View style={{ padding: 16 * s, gap: 16 }}>
     <PulseText font="black" size={24} color={C.white} lineHeight={32}>Create an Event</PulseText>
-    <Field label="Title" value={draft.title} onChange={title => change({ title })} editable={!busy} placeholder="Pick up basketball" />
-    <Field label="Location" value={draft.location} onChange={location => change({ location })} editable={!busy} placeholder="Junker main gym" />
-    <FilterGroup title="Category" options={eventCategories} value={draft.category} onChange={category => { if (!busy) change({ category }); }} />
-    <EventDateTimeFields draft={draft} disabled={busy} onChange={change} />
-    <View style={{ gap: 12 }}><PulseText size={18}>Age eligibility</PulseText><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>{([0, 18, 21] as const).map(age => <Pressable key={age} accessibilityRole="radio" accessibilityLabel={age ? `${age} and older` : 'All ages'} accessibilityState={{ checked: (draft.age_min ?? 0) === age, disabled: busy }} disabled={busy} onPress={() => change({ age_min: age })} style={{ minWidth: 70, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: (draft.age_min ?? 0) === age ? C.pink : C.muted, padding: 12, justifyContent: 'center', alignItems: 'center' }}><PulseText size={14}>{age ? `${age}+` : 'All ages'}</PulseText></Pressable>)}</View><PulseText size={14}>Age eligibility is self-reported, not verified identification.</PulseText></View>
+    <EventFormFields draft={draft} busy={busy} change={change} />
     <Message text={error} error />
     <Button label={busy ? 'Posting…' : 'Post event'} onPress={() => void post()} disabled={busy} />
   </View>;
+}
+
+export function EventFormFields({ draft, busy, change }: { draft: EventDraft; busy: boolean; change: (values: Partial<EventDraft>) => void }) {
+  return <>
+    <Field label="Title" value={draft.title} onChange={title => change({ title })} editable={!busy} placeholder="Pick up basketball" />
+    <Field label="Location" value={draft.location} onChange={location => change({ location })} editable={!busy} placeholder="Junker main gym" />
+    <FilterGroup title="Category" options={eventCategories} value={draft.category} onChange={category => { if (!busy) change({ category }); }} />
+    <Field label="Timezone" value={draft.timezone} onChange={timezone => change({ timezone })} editable={!busy} placeholder="America/New_York" />
+    <EventDateTimeFields draft={draft} disabled={busy} onChange={change} />
+    <View style={{ gap: 12 }}><PulseText size={18}>Age eligibility</PulseText><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>{([0, 18, 21] as const).map(age => <Pressable key={age} accessibilityRole="radio" accessibilityLabel={age ? `${age} and older` : 'All ages'} accessibilityState={{ checked: (draft.age_min ?? 0) === age, disabled: busy }} disabled={busy} onPress={() => change({ age_min: age })} style={{ minWidth: 70, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: (draft.age_min ?? 0) === age ? C.pink : C.muted, padding: 12, justifyContent: 'center', alignItems: 'center' }}><PulseText size={14}>{age ? `${age}+` : 'All ages'}</PulseText></Pressable>)}</View><PulseText size={14}>Age eligibility is self-reported, not verified identification.</PulseText></View>
+  </>;
 }
 
 export function MapScreen() {

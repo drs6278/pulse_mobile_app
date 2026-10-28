@@ -1,9 +1,17 @@
 import { describe, expect, jest, test } from '@jest/globals';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { profileInitials, validateProfile } from '../types';
-import { saveProfile } from '../repository';
+import { invokeProfileFunction, saveProfile } from '../repository';
 
 describe('profile validation and atomic saves', () => {
+  test('missing photo service gives an actionable error instead of hiding the cause', async () => {
+    const client = { functions: { invoke: jest.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue({ data: null, error: { context: new Response(JSON.stringify({ message: 'Requested function was not found' }), { status: 404 }) } }) } } as unknown as SupabaseClient;
+    await expect(invokeProfileFunction(client, 'profile-avatar', new ArrayBuffer(4), 'image/png')).rejects.toThrow('save without the new photo');
+  });
+  test('photo validation errors from the server remain visible', async () => {
+    const client = { functions: { invoke: jest.fn<(...args: unknown[]) => Promise<unknown>>().mockResolvedValue({ data: null, error: { context: { status: 400, json: async () => ({ error: 'Choose a photo with no more than 4 million pixels.' }) } } }) } } as unknown as SupabaseClient;
+    await expect(invokeProfileFunction(client, 'profile-avatar', new ArrayBuffer(4), 'image/png')).rejects.toThrow('4 million pixels');
+  });
   test('validates Unicode length, blank names, control characters, and age bands', () => {
     expect(validateProfile({ display_name: '  ', bio: '', age_band: 'unknown' })).toHaveProperty('display_name');
     expect(validateProfile({ display_name: 'Alice\nAdmin', bio: '', age_band: 'unknown' })).toHaveProperty('display_name');

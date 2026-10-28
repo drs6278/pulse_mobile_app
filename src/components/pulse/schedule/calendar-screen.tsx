@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { DateTime } from 'luxon';
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, FlatList, Pressable, ScrollView, View } from 'react-native';
+import { AppState, FlatList, Pressable, View } from 'react-native';
 import { PulseColors as C } from '@/constants/pulse-theme';
 import { useCalendarEntries } from '@/hooks/use-calendar-entries';
 import { fetchCalendarCandidates, type PulseEvent } from '@/lib/event-query';
@@ -16,14 +16,14 @@ import { useEvents } from '@/providers/events-provider';
 import { useSchedule } from '@/providers/schedule-provider';
 import { useRSVPs } from '@/providers/rsvp-provider';
 import { PreviewLink, PulseText, Screen, TitleHeader } from '../ui';
-import { Button, Loading, Message } from './controls';
+import { Button, Disclosure, Loading, Message } from './controls';
 
 export default function CalendarScreen() {
   const schedule = useSchedule(), rsvps = useRSVPs();
   const preferences = schedule.data?.preferences ?? defaultPreferences();
   const zone = preferences.timezone;
   const [selected, setSelected] = useState(() => DateTime.now().setZone(zone).toISODate()!);
-  const [mode, setMode] = useState<'day' | 'week'>('week');
+  const [menu, setMenu] = useState(false);
   const [rsvpError, setRSVPError] = useState<string | null>(null), [canceling, setCanceling] = useState(false);
   async function cancelUnavailable(eventId: string) {
     setCanceling(true); setRSVPError(null);
@@ -32,8 +32,8 @@ export default function CalendarScreen() {
     finally { setCanceling(false); }
   }
   const day = DateTime.fromISO(selected, { zone }).startOf('day');
-  const first = mode === 'week' ? day.startOf('week') : day;
-  const range = { start: first.toMillis(), end: first.plus({ days: mode === 'week' ? 7 : 1 }).toMillis() };
+  const first = day.startOf('week');
+  const range = { start: first.toMillis(), end: first.plus({ days: 7 }).toMillis() };
   const calendar = useCalendarEntries(range);
   const refreshSchedule = schedule.refresh, refreshRSVPs = rsvps.refresh;
   const refresh = useCallback(() => { refreshSchedule(); refreshRSVPs(); }, [refreshSchedule, refreshRSVPs]);
@@ -52,46 +52,49 @@ export default function CalendarScreen() {
     end: DateTime.fromISO(`${selected}T${preferences.day_end}`, { zone }).toMillis(),
   }, preferences.minimum_gap) : [];
   const format = (value: number) => DateTime.fromMillis(value, { zone }).toFormat('ccc h:mm a');
-  return <Screen scroll={false} header={<TitleHeader title="Your calendar" right={<PreviewLink href="/schedule-settings" label="Schedule settings"><PulseText size={14}>Settings</PulseText></PreviewLink>} />} bottomBar activeTab="calendar">
-    <FlatList data={entries} keyExtractor={item => item.id} contentContainerStyle={{ padding: 16, gap: 12 }}
+  return <Screen scroll={false} header={<TitleHeader title="Your calendar" right={<Button label="Schedule" expanded={menu} onPress={() => setMenu(!menu)} />} />} bottomBar activeTab="calendar">
+    <FlatList refreshing={calendar.loading} onRefresh={refresh} data={entries} keyExtractor={item => item.id} contentContainerStyle={{ padding: 16, gap: 12 }}
       ListHeaderComponent={<View style={{ gap: 12, paddingBottom: 12 }}>
-        <PulseText size={20}>{day.toFormat('MMMM d, yyyy')}</PulseText><Message text={`Times in ${zone}. Refresh checks for changes from other devices.`} />
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 6 }}>
-          <Button label="Previous" onPress={() => setSelected(day.minus({ days: mode === 'week' ? 7 : 1 }).toISODate()!)} />
+        {menu && <View style={{ gap: 8 }}>
+          <PreviewLink href="/import-schedule" label="Import schedule" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Import schedule</PulseText></PreviewLink>
+          <PreviewLink href={{ pathname: '/schedule-settings', params: { section: 'entries' } }} label="Manage entries" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Manage entries</PulseText></PreviewLink>
+          <PreviewLink href={{ pathname: '/schedule-settings', params: { section: 'preferences' } }} label="Schedule preferences" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Preferences</PulseText></PreviewLink>
+        </View>}
+        <PulseText size={20}>{day.toFormat('MMMM yyyy')}</PulseText>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 6 }}>
+          <Button label="Previous week" onPress={() => setSelected(day.minus({ days: 7 }).toISODate()!)} />
           <Button label="Today" onPress={() => setSelected(DateTime.now().setZone(zone).toISODate()!)} />
-          <Button label="Next" onPress={() => setSelected(day.plus({ days: mode === 'week' ? 7 : 1 }).toISODate()!)} />
+          <Button label="Next week" onPress={() => setSelected(day.plus({ days: 7 }).toISODate()!)} />
         </View>
-        <View style={{ flexDirection: 'row', gap: 8 }}><Button label={mode === 'day' ? '✓ Day' : 'Day'} onPress={() => setMode('day')} /><Button label={mode === 'week' ? '✓ Week' : 'Week'} onPress={() => setMode('week')} /><Button label="Refresh" onPress={refresh} /></View>
-        {mode === 'week' && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 2 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 2 }}>
           {Array.from({ length: 7 }, (_, index) => {
             const date = first.plus({ days: index }), start = date.toMillis(), end = date.plus({ days: 1 }).toMillis();
             const count = [...calendar.occurrences, ...calendar.events].filter(item => item.start < end && start < item.end).length;
             const active = date.toISODate() === selected;
-            return <Pressable key={index} accessibilityRole="button" accessibilityLabel={`${date.toFormat('cccc, MMMM d')}, ${count} ${count === 1 ? 'entry' : 'entries'}`} accessibilityState={{ selected: active }} onPress={() => setSelected(date.toISODate()!)} style={{ width: 44, minHeight: 80, paddingVertical: 10, paddingHorizontal: 2, gap: 4, borderRadius: 12, alignItems: 'center', backgroundColor: active ? C.pink : C.surface }}>
+            return <Pressable key={index} accessibilityRole="button" accessibilityLabel={`${date.toFormat('cccc, MMMM d')}, ${count} ${count === 1 ? 'entry' : 'entries'}`} accessibilityState={{ selected: active }} onPress={() => setSelected(date.toISODate()!)} style={{ flex: 1, minWidth: 44, minHeight: 80, paddingVertical: 10, paddingHorizontal: 2, gap: 4, borderRadius: 12, alignItems: 'center', backgroundColor: active ? C.pink : C.surface }}>
               <PulseText size={12}>{date.toFormat('ccc')}</PulseText><PulseText size={18}>{date.day}</PulseText><PulseText size={11}>{count}</PulseText>
             </Pressable>;
           })}
-        </ScrollView>}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
-          <PreviewLink href="/schedule-entry" label="Add a class or commitment" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Add entry</PulseText></PreviewLink>
-          <PreviewLink href="/import-schedule" label="Import schedule" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Import</PulseText></PreviewLink>
-          <PreviewLink href="/schedule-settings" label="Manage all schedule entries" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Manage entries</PulseText></PreviewLink>
         </View>
-        <Message text={calendar.error} error />{calendar.loading && <Loading />}
+        <PreviewLink href={{ pathname: '/schedule-entry', params: { date: selected } }} label="Add a class or commitment" style={{ minHeight: 48, padding: 12, borderRadius: 14, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' }}><PulseText>Add entry</PulseText></PreviewLink>
+        <Message text={calendar.error} error />{calendar.error && <Button label="Retry calendar" onPress={refresh} />}{calendar.loading && <Loading />}
         {!!calendar.unknown.length && <Message text={`${calendar.unknown.length} RSVP(s) have unknown times or are unavailable. Availability cannot be confirmed.`} />}
-        <PulseText size={20}>Selected day</PulseText>
+        <PulseText size={20}>{day.toFormat('cccc, MMMM d')}</PulseText><Message text={`Times in ${zone.replace(/_/g, ' ')}`} />
       </View>}
-      renderItem={({ item }) => <PreviewLink href={item.href} label={`Open ${item.title}`} style={{ backgroundColor: '#20242D', padding: 14, borderRadius: 14, gap: 6 }}>
-        <PulseText size={13}>{item.kind}</PulseText><PulseText size={20}>{item.title}</PulseText><Message text={item.allDay ? 'All day' : `${format(item.start)} – ${format(item.end)}`} /><Message text={item.location} />
+      renderItem={({ item }) => <PreviewLink href={item.href} label={`Open ${item.title}`} style={{ backgroundColor: C.surface, padding: 14, borderRadius: 14, flexDirection: 'row', gap: 12 }}>
+        <View style={{ width: 80, gap: 4 }}><PulseText size={14}>{item.allDay ? 'All day' : DateTime.fromMillis(item.start, { zone }).toLocaleString(DateTime.TIME_SIMPLE)}</PulseText>{!item.allDay && <Message text={DateTime.fromMillis(item.end, { zone }).toFormat(item.end > selectedRange.end ? 'ccc h:mm a' : 'h:mm a')} />}</View>
+        <View style={{ flex: 1, gap: 6 }}><PulseText size={20}>{item.title}</PulseText><Message text={item.location} /><Message text={item.kind} /></View>
       </PreviewLink>}
       ListEmptyComponent={!calendar.loading && !calendar.error ? <Message text="No entries on this day. Add a class, commitment, or RSVP to a Pulse event." /> : null}
       ListFooterComponent={<View style={{ gap: 14, paddingTop: 16 }}>
         {calendar.unknown.map(item => <View key={String(item.event_id)} style={{ gap: 8 }}><PreviewLink href={{ pathname: '/event', params: { id: String(item.event_id) } }} label="Open RSVP with unknown time"><PulseText>{item.event?.title ?? 'Unavailable RSVP'}</PulseText></PreviewLink><Message text="Time unavailable. Review this RSVP before relying on free-time suggestions." /><Button label={`Cancel RSVP: ${item.event?.title ?? 'unavailable event'}`} disabled={canceling} onPress={() => void cancelUnavailable(String(item.event_id))} /></View>)}
         <Message text={rsvpError} error />
-        <PulseText size={20}>Available time</PulseText>
+        {!calendar.complete && <Message text="Availability is not confirmed until your schedule and RSVP times are loaded successfully." />}
+        <Disclosure label="Available time" summary={calendar.complete ? `${windows.length} free ${windows.length === 1 ? 'window' : 'windows'} today` : 'Availability is not confirmed'}>
         {!calendar.complete ? <Message text="Load a complete schedule and known RSVP times to calculate availability." /> : windows.length ? windows.map(window => <Message key={window.start} text={`${format(window.start)} – ${format(window.end)}`} />) : <Message text="No free windows meet your preferences on this day." />}
         {calendar.complete && <Message text="Available time reflects your saved schedule and going RSVPs; it does not include other device calendars." />}
-        <Recommendations start={range.start} end={range.end} calendar={calendar} />
+        </Disclosure>
+        <Disclosure label="Activities this week"><Recommendations start={range.start} end={range.end} calendar={calendar} /></Disclosure>
       </View>} />
   </Screen>;
 }

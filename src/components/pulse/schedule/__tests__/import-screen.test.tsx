@@ -28,6 +28,13 @@ jest.mock('../../ui', () => {
   const { View, Text } = jest.requireActual<typeof import('react-native')>('react-native');
   return { Screen: ({ children }: { children: React.ReactNode }) => <View>{children}</View>, TitleHeader: () => null, PulseText: ({ children }: { children: React.ReactNode }) => <Text>{children}</Text> };
 });
+jest.mock('../../event-date-time-input', () => {
+  const { TextInput, View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return { EventDateTimeInput: ({ label, value, onChange, mode, disabled }: { label: string; value: string; onChange: (value: string) => void; mode?: string; disabled: boolean }) => <View>
+    {mode !== 'time' && <TextInput accessibilityLabel={`${label} date`} value={value.slice(0, 10)} editable={!disabled} onChangeText={date => onChange(`${date}T${value.slice(11)}`)} />}
+    {mode !== 'date' && <TextInput accessibilityLabel={`${label} time`} value={value.slice(11, 16)} editable={!disabled} onChangeText={time => onChange(`${value.slice(0, 10)}T${time}:00`)} />}
+  </View> };
+});
 beforeEach(() => {
   mockPick.mockReset(); mockCommit.mockReset(); mockReplace.mockReset(); mockPrepare.mockReset();
   mockDiscard.mockReset().mockResolvedValue(undefined); mockRemove.mockReset().mockResolvedValue(undefined);
@@ -65,7 +72,7 @@ test('invalid times can be corrected before saving and confirmation resets after
   fireEvent.press(screen.getByLabelText('Choose ICS or CSV file'));
   await waitFor(() => expect(screen.getByLabelText('Correct entry: CS')).toBeTruthy());
   fireEvent.press(screen.getByLabelText('Correct entry: CS'));
-  fireEvent.changeText(screen.getByLabelText('Start time (HH:mm)'), '09:00');
+  fireEvent.changeText(screen.getByLabelText('Start time'), '09:00');
   expect(screen.queryByLabelText('Invalid — skipped')).toBeNull();
   fireEvent.press(screen.getByLabelText('Confirm timezone, selections and updates'));
   expect(screen.getByLabelText('Save 1 selected entries')).toBeEnabled();

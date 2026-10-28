@@ -1,13 +1,17 @@
+import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { PulseColors as C } from '@/constants/pulse-theme';
 import { PulseText } from './ui';
 import type { EventDateTimeInputProps } from './event-date-time-input';
 
-export function EventDateTimeInput({ label, value, disabled, onChange }: EventDateTimeInputProps) {
+export function EventDateTimeInput({ label, value, disabled, onChange, mode: inputMode, focusRequest }: EventDateTimeInputProps) {
+  const dateRef = useRef<HTMLInputElement>(null), timeRef = useRef<HTMLInputElement>(null);
+  const focusId = focusRequest?.id, focusMode = focusRequest?.mode;
+  useEffect(() => { if (focusId) (focusMode === 'date' ? dateRef : timeRef).current?.focus(); }, [focusId, focusMode]);
   return <View style={{ gap: 8 }}>
-    {(['date', 'time'] as const).map(mode => <label key={mode} style={{ display: 'grid', gap: 6 }}>
+    {(['date', 'time'] as const).filter(mode => !inputMode || mode === inputMode).map(mode => <label key={mode} style={{ display: 'grid', gap: 6 }}>
       <PulseText size={14}>{label} {mode}</PulseText>
-      <input type={mode} aria-label={`${label} ${mode}`} disabled={disabled}
+      <input ref={mode === 'date' ? dateRef : timeRef} type={mode} aria-label={`${label} ${mode}`} disabled={disabled}
         value={mode === 'date' ? value.slice(0, 10) : value.slice(11, 16)}
         onChange={event => {
           if (!event.target.value || !event.target.validity.valid) return;

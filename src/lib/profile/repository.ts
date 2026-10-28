@@ -63,7 +63,15 @@ export async function invokeProfileFunction<T>(client: SupabaseClient, name: str
   const { data, error } = await client.functions.invoke(name, { body, ...(mime ? { headers: { 'Content-Type': mime } } : {}) });
   if (error) {
     let message = 'Unable to complete this request. Please try again.';
-    try { const response = await error.context?.json(); if (typeof response?.error === 'string') message = response.error; } catch { /* Transport errors have no JSON response. */ }
+    const status = error.context?.status;
+    try {
+      const response = await error.context?.json();
+      if (typeof response?.error === 'string') message = response.error;
+      else if (typeof response?.message === 'string') message = response.message;
+    } catch { /* Transport errors have no JSON response. */ }
+    if (name === 'profile-avatar' && (status === 404 || status === 503)) {
+      message = 'Photo uploads are unavailable right now. Retry later, or save without the new photo to keep your current profile photo.';
+    }
     throw new Error(message);
   }
   if (data?.error) throw new Error(data.error);

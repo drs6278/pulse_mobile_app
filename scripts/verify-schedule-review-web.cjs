@@ -109,12 +109,21 @@ async function run() {
     async function input(label, value) { await evaluate(`(()=>{const el=document.querySelector('[aria-label='+CSS.escape(${JSON.stringify(label)})+']');const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;setter.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}));})()`); }
     async function screenshot(name) { const shot = await call('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(path.join(output, name + '.png'), Buffer.from(shot.data, 'base64')); }
     await visit('/calendar', 'Synthetic class'); await screenshot('calendar');
-    await visit('/schedule-entry', 'Start date (YYYY-MM-DD)'); await input('Title', 'Synthetic new commitment');
+    assert(await evaluate(`!document.body.innerText.includes('Fits my schedule only')`), 'Recommendations should start collapsed');
+    await click('Add a class or commitment'); await waitFor('Date & time');
+    assert(await evaluate(`document.querySelector('[aria-label="Start date"]').value === ${JSON.stringify(today)}`), 'Add must use the selected day');
+    await click('Save entry');
+    assert(await evaluate(`document.activeElement?.getAttribute('aria-label') === 'Title'`), 'Invalid save must focus title');
+    assert(!writes.includes('save_schedule'), 'Invalid entry saved');
+    await input('Title', 'Synthetic new commitment');
+    await input('Start time', '11:30');
+    assert(await evaluate(`document.querySelector('[aria-label="End time"]').value === '12:30'`), 'Moving start should preserve duration');
+    await screenshot('entry');
     await click('Save entry'); await waitFor('Your calendar'); assert(writes.includes('save_schedule'));
     await visit('/schedule-entry?id=00000000-0000-0000-0000-000000000002', 'Edit schedule entry');
-    await waitFor('Editing a single class or commitment.'); await input('Title', 'Edited synthetic class'); await click('Save entry'); await waitFor('Your calendar');
+    await waitFor('Date & time'); await input('Title', 'Edited synthetic class'); await click('Save entry'); await waitFor('Your calendar');
     assert(rows.some(item => item.title === 'Edited synthetic class'), 'One-off title edit did not save');
-    await visit('/event?id=event-1', 'Synthetic campus concert'); await click('RSVP — I’m going'); await waitFor('Cancel RSVP'); assert(writes.includes('event_rsvps'));
+    await visit('/event?id=event-1', 'Synthetic campus concert'); await click('RSVP â€” Iâ€™m going'); await waitFor('Cancel RSVP'); assert(writes.includes('event_rsvps'));
     await visit('/import-schedule', 'Choose ICS or CSV file'); await click('Choose ICS or CSV file'); await waitFor('Computer Science');
     assert(writes.includes('create_schedule_source') && writes.includes('storage-POST') && writes.includes('schedule-source'), 'Upload/parse missing');
     assert(!writes.includes('commit_schedule_import'), 'Import saved before review');
@@ -123,7 +132,7 @@ async function run() {
     assert(rows.some(item => item.title === 'Corrected Computer Science'), 'Corrected preview not saved');
     assert(writes.includes('storage-DELETE') && writes.includes('finish_schedule_source_cleanup'), 'Source cleanup missing');
     await visit('/schedule-settings', 'Manage schedule entries'); await input('Find a class or commitment', 'Corrected'); await waitFor('Corrected Computer Science'); await screenshot('management');
-    await click('Clear entire schedule'); assert(rows.length > 0, 'Clear must require confirmation'); await click('Keep entire schedule'); assert(rows.length > 0);
+    await click('Destructive actions'); await click('Clear entire schedule'); assert(rows.length > 0, 'Clear must require confirmation'); await click('Keep entire schedule'); assert(rows.length > 0);
     await click('Clear entire schedule'); await click('Confirm clear entire schedule'); await waitFor('Your schedule has no classes or commitments.');
     assert.equal(rows.length, 0); assert.equal(imports.length, 0); assert.equal(rsvps[0].status, 'going');
     missingSchema = true; await visit('/calendar', 'Scheduling is not set up on this server yet.');

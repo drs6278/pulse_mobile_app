@@ -10,6 +10,7 @@ import { ChangePasswordScreen, DeleteAccountScreen } from '../security-screens';
 const mockReplace = jest.fn(), mockRefresh = jest.fn(), mockPreventRemove = jest.fn();
 const mockSave = jest.fn<(...args: unknown[]) => Promise<void>>(), mockInvoke = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockLoad = jest.fn<(...args: unknown[]) => Promise<OwnProfile>>();
+const mockPickAvatar = jest.fn<() => Promise<import('@/lib/profile/types').PickedAvatar | null>>();
 const mockUpdatePassword = jest.fn<(...args: unknown[]) => Promise<{ error: null | { message: string; code: string } }>>();
 const mockReauth = jest.fn<() => Promise<{ error: null }>>();
 const initial: OwnProfile = { public: { user_id: 'alice', display_name: 'Alice', bio: 'Hello campus', avatar_path: null, version: 7, updated_at: '2026-01-01' }, private: { user_id: 'alice', age_band: '21_plus', account_state: 'active', profile_hidden: false, profile_setup_completed_at: '2026-01-01', created_at: '2026-01-01' } };
@@ -23,7 +24,7 @@ jest.mock('@/providers/profile-provider', () => ({ useProfile: () => mockResourc
 jest.mock('@/providers/events-provider', () => ({ useEvents: () => ({ refresh: mockRefresh }) }));
 jest.mock('@/providers/rsvp-provider', () => ({ useRSVPs: () => ({ refresh: mockRefresh }) }));
 jest.mock('@/hooks/use-user-resource', () => ({ useUserResource: () => ({ loading: false, error: null, data: { hosted_events: 2, schedule_entries: 3 }, refresh: mockRefresh }) }));
-jest.mock('@/lib/profile/pick-avatar', () => ({ pickAvatar: async () => null }));
+jest.mock('@/lib/profile/pick-avatar', () => ({ pickAvatar: () => mockPickAvatar() }));
 jest.mock('@/lib/profile/repository', () => ({ saveProfile: (...args: unknown[]) => mockSave(...args), loadOwnProfile: (...args: unknown[]) => mockLoad(...args), invokeProfileFunction: (...args: unknown[]) => mockInvoke(...args), profileSessionClient: () => ({ original: true }), profileError: (value: { message: string }) => value.message }));
 jest.mock('@/lib/supabase', () => ({ supabase: { auth: { updateUser: (...args: unknown[]) => mockUpdatePassword(...args), reauthenticate: () => mockReauth(), signOut: () => mockSignOut() } } }));
 jest.mock('expo-router', () => ({ router: { replace: (...args: unknown[]) => mockReplace(...args) }, useNavigation: () => ({ dispatch: jest.fn() }), useFocusEffect: () => {}, usePathname: () => mockPathname }));
@@ -43,6 +44,7 @@ jest.mock('../controls', () => {
   };
 });
 beforeEach(() => {
+  mockPickAvatar.mockReset().mockResolvedValue(null);
   mockReplace.mockReset(); mockPreventRemove.mockReset(); mockRefresh.mockReset(); mockSave.mockReset().mockResolvedValue(undefined);
   mockInvoke.mockReset().mockResolvedValue({ accepted: true }); mockSignOut.mockReset().mockResolvedValue({ error: null });
   mockLoad.mockReset().mockResolvedValue({ ...initial, public: { ...initial.public!, display_name: 'Latest Alice', version: 8 } });
@@ -161,6 +163,35 @@ test('save failures retain the draft and show an actionable error', async () => 
   fireEvent.changeText(screen.getByLabelText('Bio (optional)'), 'Updated against latest');
   fireEvent.press(screen.getByLabelText('Save profile'));
   await waitFor(() => expect(mockSave).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ bio: 'Updated against latest' }), 8, undefined));
+});
+
+test('PNG upload failure keeps bio and allows an explicit text save preserving the current photo', async () => {
+  mockPickAvatar.mockResolvedValueOnce({ bytes: new Uint8Array([137, 80, 78, 71]), mime: 'image/png', uri: 'blob:photo', dispose: jest.fn() });
+  mockInvoke.mockRejectedValueOnce(new Error('Photo uploads are unavailable right now.'));
+  const screen = render(<ProfileEditor initial={{ ...initial, public: { ...initial.public!, avatar_path: 'alice/old.jpg' } }} />);
+  fireEvent.press(screen.getByLabelText('Choose profile photo'));
+  await waitFor(() => expect(screen.getByLabelText('Bio (optional)').props.editable).toBe(true));
+  fireEvent.changeText(screen.getByLabelText('Bio (optional)'), 'My new bio');
+  fireEvent.press(screen.getByLabelText('Save profile'));
+  await waitFor(() => expect(screen.getByLabelText('Save without new photo')).toBeTruthy());
+  expect(mockInvoke).toHaveBeenCalledWith(expect.anything(), 'profile-avatar', expect.any(ArrayBuffer), 'image/png');
+  expect(mockSave).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('Bio (optional)').props.value).toBe('My new bio');
+  fireEvent.press(screen.getByLabelText('Save without new photo'));
+  await waitFor(() => expect(mockSave).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ bio: 'My new bio' }), 7, undefined));
+  expect(mockInvoke).toHaveBeenCalledTimes(1);
+  await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/profile'));
+});
+
+test('PNG and bio save together after a successful photo upload', async () => {
+  mockPickAvatar.mockResolvedValueOnce({ bytes: new Uint8Array([137, 80, 78, 71]), mime: 'image/png', uri: 'blob:photo', dispose: jest.fn() });
+  mockInvoke.mockResolvedValueOnce({ path: 'alice/new.jpg' });
+  const screen = render(<ProfileEditor initial={initial} />);
+  fireEvent.press(screen.getByLabelText('Choose profile photo'));
+  await waitFor(() => expect(screen.getByLabelText('Bio (optional)').props.editable).toBe(true));
+  fireEvent.changeText(screen.getByLabelText('Bio (optional)'), 'With a PNG');
+  fireEvent.press(screen.getByLabelText('Save profile'));
+  await waitFor(() => expect(mockSave).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ bio: 'With a PNG' }), 7, 'alice/new.jpg'));
 });
 test('password changes handle secure-change verification codes and clear passwords on success', async () => {
   mockUpdatePassword.mockResolvedValueOnce({ error: { code: 'reauthentication_needed', message: 'Verify your identity.' } });

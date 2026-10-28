@@ -1,5 +1,29 @@
 # Recover the “Profiles are not available” account screen
 
+## Profile photo and bio save failure
+
+On October 23, 2026, an OPTIONS request to the connected project's
+`/functions/v1/profile-avatar` endpoint returned HTTP 404. The photo function
+is missing; PNG is already an accepted format. The editor uploads the photo
+before saving the profile transaction, so this failure also prevents the bio
+from being saved. The client now explains upload unavailability, retains drafts,
+and offers an explicit **Save without new photo** action that preserves the
+existing avatar while saving text and age eligibility.
+
+After Supabase CLI login, `profile-avatar` was deployed to the connected project
+on October 23, 2026. The function inventory reports ACTIVE, version 1, with JWT
+verification enabled. A live OPTIONS request now returns HTTP 200 with the
+expected CORS header, confirming runtime startup including WASM initialization.
+The deployment command was:
+
+```sh
+npx supabase functions deploy profile-avatar --project-ref ngzieszcygbtvuudszjr
+```
+
+An authenticated PNG and bio save from the app still requires user verification;
+the CLI login does not provide the user's app session. Follow the authenticated
+upload checks in PROFILES.md if further diagnosis is needed.
+
 ## Recovery applied October 23, 2026
 
 The connected project `ngzieszcygbtvuudszjr` was inspected and the missing

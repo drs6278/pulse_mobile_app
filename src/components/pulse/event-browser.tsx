@@ -1,5 +1,7 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { canEditEvent } from '@/lib/event-edit';
+import { useAuth } from '@/providers/auth-provider';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 
 import { PulseColors as C } from '@/constants/pulse-theme';
@@ -80,8 +82,10 @@ export function EventFiltersScreen() {
 }
 
 export function SupabaseEventScreen({ id }: { id: string }) {
+  const { session } = useAuth();
   const [result, setResult] = useState<{ key: string; event: PulseEvent | null; error: string | null } | null>(null);
   const [revision, setRevision] = useState(0);
+  useFocusEffect(useCallback(() => { setRevision(value => value + 1); }, []));
   const key = `${id}:${revision}`;
   const current = result?.key === key ? result : null;
   const loading = !current;
@@ -111,6 +115,7 @@ export function SupabaseEventScreen({ id }: { id: string }) {
       {event.created_by && <PreviewLink href={{ pathname: '/student-profile', params: { id: event.created_by } }} label="View organizer profile" style={{ minHeight: 48, justifyContent: 'center' }}><PulseText color={C.pink}>View organizer profile ›</PulseText></PreviewLink>}
       {event.pulse_all_day_start && <PulseText size={14}>All day: {event.pulse_all_day_start} through {event.pulse_all_day_end} (exclusive end; {event.pulse_timezone ?? 'UTC'})</PulseText>}
       {event.pulse_starts_at && <PulseText size={14}>{new Date(event.pulse_starts_at).toLocaleString(undefined, { timeZone: event.pulse_timezone ?? 'UTC' })} – {event.pulse_ends_at ? new Date(event.pulse_ends_at).toLocaleString(undefined, { timeZone: event.pulse_timezone ?? 'UTC' }) : 'Time unavailable'} ({event.pulse_timezone ?? 'UTC'})</PulseText>}
+      {canEditEvent(event, session?.user.id) && <PreviewLink href={{ pathname: '/edit-event', params: { id: event.id } }} label="Edit event" style={{ minHeight: 48, justifyContent: 'center' }}><PulseText color={C.pink}>Edit event</PulseText></PreviewLink>}
       <EventActions key={String(event.id)} event={event} />
     </>}
   </View></Screen>;

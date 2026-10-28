@@ -23,6 +23,7 @@ export function ProfileForm({ initial, setup = false, onSaved }: { initial: OwnP
   // Retry verification, rather than resubmitting an already committed version.
   const committed = useRef(false);
   const [verificationPending, setVerificationPending] = useState(false);
+  const [avatarUploadFailed, setAvatarUploadFailed] = useState(false);
   const busy = saving || verificationPending;
   const [showErrors, setShowErrors] = useState(false);
   const [leave, setLeave] = useState<(() => void) | null>(null);
@@ -37,24 +38,30 @@ export function ProfileForm({ initial, setup = false, onSaved }: { initial: OwnP
   }, [dirty]);
   const errors = showErrors ? validateProfile(draft) : {};
   async function choosePhoto() {
-    setSaving(true); setError(null);
+    setSaving(true); setError(null); setAvatarUploadFailed(false);
     try { const next = await pickAvatar(); if (next) { if (!mounted.current) { next.dispose(); return; } avatarRef.current?.dispose(); avatarRef.current = next; setAvatar(next); stagedPath.current = null; setRemoveAvatar(false); } }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to select photo.'); }
     finally { if (mounted.current) setSaving(false); }
   }
-  async function save() {
+  async function save(withoutNewPhoto = false) {
     setShowErrors(true);
     if (Object.keys(validateProfile(draft)).length) return;
-    setSaving(true); setError(null);
+    setSaving(true); setError(null); setAvatarUploadFailed(false);
     try {
       const client = profileSessionClient(session?.access_token);
       await mutate(async () => {
         if (setup && committed.current) return;
-        if (avatar && !stagedPath.current) {
-          const result = await invokeProfileFunction<{ path: string }>(client, 'profile-avatar', avatar.bytes.slice().buffer as ArrayBuffer, avatar.mime);
-          stagedPath.current = result.path;
+        if (avatar && !withoutNewPhoto && !stagedPath.current) {
+          try {
+            const result = await invokeProfileFunction<{ path: string }>(client, 'profile-avatar', avatar.bytes.slice().buffer as ArrayBuffer, avatar.mime);
+            if (!result?.path) throw new Error('Photo upload did not finish. Please try again.');
+            stagedPath.current = result.path;
+          } catch (reason) {
+            if (mounted.current) setAvatarUploadFailed(true);
+            throw reason;
+          }
         }
-        await saveProfile(client, draft, profile.version, removeAvatar ? null : avatar ? stagedPath.current! : undefined);
+        await saveProfile(client, draft, profile.version, removeAvatar ? null : avatar && !withoutNewPhoto ? stagedPath.current! : undefined);
         if (setup) { committed.current = true; if (mounted.current) setVerificationPending(true); }
       }, setup ? { completeSetup: true } : undefined);
       if (mounted.current) { onSaved?.(); setSaved(true); }
@@ -69,7 +76,7 @@ export function ProfileForm({ initial, setup = false, onSaved }: { initial: OwnP
       avatarRef.current?.dispose(); avatarRef.current = null; stagedPath.current = null;
       setAvatar(null); setRemoveAvatar(false); setBaseline(latest);
       setDraft({ display_name: latest.public.display_name, bio: latest.public.bio, age_band: setup ? null : latest.private.age_band });
-      setShowErrors(false); setError(null);
+      setShowErrors(false); setError(null); setAvatarUploadFailed(false);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to reload.'); }
     finally { if (mounted.current) setSaving(false); }
   }
@@ -88,6 +95,7 @@ export function ProfileForm({ initial, setup = false, onSaved }: { initial: OwnP
       <ProfileMessage text={errors.age_band} error />
     </View>
     <ProfileMessage text={error} error />
+    {avatarUploadFailed && <><ProfileText muted>Your changes have not been saved. You can retry, or save your text and age eligibility while keeping your current profile photo.</ProfileText><ProfileButton label="Save without new photo" disabled={busy} onPress={() => void save(true)} /></>}
     {error && !verificationPending && <ProfileButton label="Discard changes and reload" disabled={busy} onPress={() => void reload()} />}
     {verificationPending && <ProfileText muted>Your profile was saved. Confirming setup with the server is required before continuing.</ProfileText>}
     <ProfileButton label={saving ? 'Saving…' : verificationPending ? 'Retry profile check' : setup ? 'Finish setup' : 'Save profile'} primary disabled={saving || (!setup && !dirty)} onPress={() => void save()} />
