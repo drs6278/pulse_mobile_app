@@ -1,4 +1,5 @@
-import { canEditEvent } from '@/lib/event-edit';
+import { useEventPermission } from '@/hooks/use-event-permission';
+import { communityRpc } from '@/lib/community';
 import { useAuth } from '@/providers/auth-provider';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -11,6 +12,9 @@ import { supabase } from '@/lib/supabase';
 import { useEvents } from '@/providers/events-provider';
 import { PreviewLink, PulseText, Screen, TitleHeader, usePulseScale } from './ui';
 import { EventActions } from './schedule/event-actions';
+import { EventDiscussion, VoteButtons } from './community';
+import { summaries, type Engagement } from '@/lib/community';
+import { ProfileLink, ProfileMessage } from './profile/controls';
 
 function EventDate({ value }: { value: string }) {
   const [year, month, day] = value.split('-').map(Number);
@@ -25,14 +29,20 @@ function TextButton({ label, onPress }: { label: string; onPress: () => void }) 
 export function EventFeed() {
   const s = usePulseScale();
   const { events, filters, loading, error, count, page, changePage, refresh } = useEvents();
+  const [scores, setScores] = useState<Record<string, Engagement>>({});
+  const [voteError, setVoteError] = useState('');
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
+  useEffect(() => { let active = true; if (events.length) void summaries('event', events.map(e => e.id)).then(rows => { if (active) { setScores(Object.fromEntries(rows.map(v => [v.id, v]))); setVoteError(''); } }).catch(e => { if (active) setVoteError(e.message); }); return () => { active = false; }; }, [events]);
   return <View style={{ padding: 14 * s, gap: 16 * s }}>
     <PulseText size={18}>{filters.categories.length ? filters.categories.join(', ') : 'All categories'} · {filters.date === 'Pick Date' ? filters.customDate : filters.date}</PulseText>
     {loading ? <ActivityIndicator accessibilityLabel="Loading events" color={C.pink} /> : error ? <View accessibilityRole="alert"><PulseText>{error}</PulseText><TextButton label="Try again" onPress={refresh} /></View> : <>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><PulseText>{count} {count === 1 ? 'event' : 'events'} found</PulseText><TextButton label="Refresh" onPress={refresh} /></View>
       {events.length === 0 && <View style={{ gap: 12 }}><PulseText size={20}>No matching events</PulseText><PulseText color={C.muted}>Try another category or date, or check back later.</PulseText><PreviewLink href="/filters" label="Change filters"><PulseText color={C.pink}>Change filters</PulseText></PreviewLink></View>}
-      {events.map(event => <PreviewLink key={event.id} href={{ pathname: '/event', params: { id: event.id } }} label={`Open ${event.title}`} style={{ borderRadius: 20 * s, overflow: 'hidden', backgroundColor: C.surface }}>
+      <ProfileLink href="/clubs" label="Discover clubs" />
+      <ProfileMessage error text={voteError} />
+      {events.map(event => <View key={event.id}><PreviewLink href={{ pathname: '/event', params: { id: event.id } }} label={`Open ${event.title}`} style={{ borderRadius: 20 * s, overflow: 'hidden', backgroundColor: C.surface }}>
         <View style={{ padding: 16 * s, gap: 8 }}><PulseText size={14} color={C.pink}>{event.category}</PulseText><PulseText size={24} font="black">{event.title}</PulseText><EventDate value={event.event_date} /><PulseText size={14} color={C.muted}>{event.location}</PulseText></View>
-      </PreviewLink>)}
+      </PreviewLink>{scores[event.id] && <><VoteButtons kind="event" value={scores[event.id]} onChange={value => setScores(previous => ({ ...previous, [event.id]: value }))} /><ProfileLink href={{ pathname: '/event', params: { id: event.id } }} label={`${scores[event.id].comment_count} comments and replies`} /></>}</View>)}
       {count > EVENTS_PER_PAGE && <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         {page > 0 ? <TextButton label="Previous" onPress={() => changePage(page - 1)} /> : <View />}
         <PulseText size={14}>Page {page + 1} of {Math.ceil(count / EVENTS_PER_PAGE)}</PulseText>
@@ -73,6 +83,7 @@ export function EventFiltersScreen() {
   }
   return <Screen header={<TitleHeader title="Filter & sort" close right={<TextButton label="Reset" onPress={() => { setDraft({ ...defaultEventFilters }); setError(null); }} />} />} action="Show Results" onAction={apply}>
     <View style={{ padding: 16, gap: 32 }}>
+      <FilterGroup title="Sort" options={['date', 'top'] as const} value={draft.sort ?? 'date'} onChange={sort => update({ sort })} />
       <CategoryFilterGroup selected={draft.categories} onToggle={category => update({ categories: category === null ? [] : draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category] })} />
       <FilterGroup title="Date" options={dateOptions} value={draft.date} onChange={date => update({ date })} />
       {draft.date === 'Pick Date' && <View style={{ gap: 8 }}><PulseText size={14}>Date (YYYY-MM-DD)</PulseText><TextInput accessibilityLabel="Event date, YYYY-MM-DD" value={draft.customDate} onChangeText={customDate => update({ customDate })} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} maxLength={10} autoCorrect={false} style={{ minHeight: 48, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: C.muted, color: C.white, fontSize: 16 }} /></View>}
@@ -90,6 +101,7 @@ export function SupabaseEventScreen({ id }: { id: string }) {
   const current = result?.key === key ? result : null;
   const loading = !current;
   const event = current?.event;
+  const allowed = useEventPermission(event, session?.user.id);
   const error = current?.error;
   useEffect(() => {
     const controller = new AbortController();
@@ -108,15 +120,18 @@ export function SupabaseEventScreen({ id }: { id: string }) {
     })();
     return () => { active = false; controller.abort(); };
   }, [id, key]);
-  return <Screen header={<TitleHeader title="Event details" right={<TextButton label="Refresh" onPress={() => setRevision(value => value + 1)} />} />}><View style={{ padding: 16, gap: 16 }}>
+  return <Screen onRefresh={() => setRevision(value => value + 1)} refreshing={loading} header={<TitleHeader title="Event details" right={<TextButton label="Refresh" onPress={() => setRevision(value => value + 1)} />} />}><View style={{ padding: 16, gap: 16 }}>
     {loading ? <ActivityIndicator accessibilityLabel="Loading event" color={C.pink} /> : error ? <View accessibilityRole="alert"><PulseText>{error}</PulseText><TextButton label="Try again" onPress={() => setRevision(value => value + 1)} /></View> : event && <>
       <PulseText color={C.pink}>{event.category}</PulseText><PulseText size={28} font="black">{event.title}</PulseText><EventDate value={event.event_date} /><PulseText>{event.location}</PulseText>
       {!!event.pulse_age_min && <PulseText size={14}>{event.pulse_age_min}+ · Self-reported age eligibility required</PulseText>}
       {event.created_by && <PreviewLink href={{ pathname: '/student-profile', params: { id: event.created_by } }} label="View organizer profile" style={{ minHeight: 48, justifyContent: 'center' }}><PulseText color={C.pink}>View organizer profile ›</PulseText></PreviewLink>}
       {event.pulse_all_day_start && <PulseText size={14}>All day: {event.pulse_all_day_start} through {event.pulse_all_day_end} (exclusive end; {event.pulse_timezone ?? 'UTC'})</PulseText>}
       {event.pulse_starts_at && <PulseText size={14}>{new Date(event.pulse_starts_at).toLocaleString(undefined, { timeZone: event.pulse_timezone ?? 'UTC' })} – {event.pulse_ends_at ? new Date(event.pulse_ends_at).toLocaleString(undefined, { timeZone: event.pulse_timezone ?? 'UTC' }) : 'Time unavailable'} ({event.pulse_timezone ?? 'UTC'})</PulseText>}
-      {canEditEvent(event, session?.user.id) && <PreviewLink href={{ pathname: '/edit-event', params: { id: event.id } }} label="Edit event" style={{ minHeight: 48, justifyContent: 'center' }}><PulseText color={C.pink}>Edit event</PulseText></PreviewLink>}
+      {event.club_id && <ProfileLink href={{ pathname: '/clubs', params: { id: event.club_id } }} label="View hosting club" />}
+      {allowed && <PreviewLink href={{ pathname: '/edit-event', params: { id: event.id } }} label="Edit event" style={{ minHeight: 48, justifyContent: 'center' }}><PulseText color={C.pink}>Edit event</PulseText></PreviewLink>}
+      {allowed && event.club_id && <TextButton label="Cancel club event" onPress={() => { void communityRpc('cancel_club_event', { p_event: event.id }).then(() => setRevision(v => v + 1)).catch(() => setResult({ key, event, error: 'Unable to cancel club event. Refresh and try again.' })); }} />}
       <EventActions key={String(event.id)} event={event} />
+      <EventDiscussion key={`discussion:${session?.user.id}:${event.id}:${revision}`} eventId={event.id} />
     </>}
   </View></Screen>;
 }

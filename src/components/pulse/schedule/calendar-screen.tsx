@@ -1,7 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import { DateTime } from 'luxon';
-import { useCallback, useEffect, useState } from 'react';
-import { AppState, FlatList, Pressable, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, FlatList, View } from 'react-native';
 import { PulseColors as C } from '@/constants/pulse-theme';
 import { useCalendarEntries } from '@/hooks/use-calendar-entries';
 import { fetchCalendarCandidates, type PulseEvent } from '@/lib/event-query';
@@ -16,6 +16,7 @@ import { useEvents } from '@/providers/events-provider';
 import { useSchedule } from '@/providers/schedule-provider';
 import { useRSVPs } from '@/providers/rsvp-provider';
 import { PreviewLink, PulseText, Screen, TitleHeader } from '../ui';
+import { CalendarNavigation } from './calendar-navigation';
 import { Button, Disclosure, Loading, Message } from './controls';
 
 export default function CalendarScreen() {
@@ -23,6 +24,7 @@ export default function CalendarScreen() {
   const preferences = schedule.data?.preferences ?? defaultPreferences();
   const zone = preferences.timezone;
   const [selected, setSelected] = useState(() => DateTime.now().setZone(zone).toISODate()!);
+  const list = useRef<FlatList>(null);
   const [menu, setMenu] = useState(false);
   const [rsvpError, setRSVPError] = useState<string | null>(null), [canceling, setCanceling] = useState(false);
   async function cancelUnavailable(eventId: string) {
@@ -53,29 +55,14 @@ export default function CalendarScreen() {
   }, preferences.minimum_gap) : [];
   const format = (value: number) => DateTime.fromMillis(value, { zone }).toFormat('ccc h:mm a');
   return <Screen scroll={false} header={<TitleHeader title="Your calendar" right={<Button label="Schedule" expanded={menu} onPress={() => setMenu(!menu)} />} />} bottomBar activeTab="calendar">
-    <FlatList refreshing={calendar.loading} onRefresh={refresh} data={entries} keyExtractor={item => item.id} contentContainerStyle={{ padding: 16, gap: 12 }}
+    <CalendarNavigation selected={selected} zone={zone} onSelect={value => { setSelected(value); list.current?.scrollToOffset({ offset: 0, animated: false }); }} />
+    <FlatList ref={list} refreshing={calendar.loading} onRefresh={refresh} data={entries} keyExtractor={item => item.id} contentContainerStyle={{ padding: 16, gap: 12 }}
       ListHeaderComponent={<View style={{ gap: 12, paddingBottom: 12 }}>
         {menu && <View style={{ gap: 8 }}>
           <PreviewLink href="/import-schedule" label="Import schedule" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Import schedule</PulseText></PreviewLink>
           <PreviewLink href={{ pathname: '/schedule-settings', params: { section: 'entries' } }} label="Manage entries" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Manage entries</PulseText></PreviewLink>
           <PreviewLink href={{ pathname: '/schedule-settings', params: { section: 'preferences' } }} label="Schedule preferences" style={{ minHeight: 44, justifyContent: 'center' }}><PulseText>Preferences</PulseText></PreviewLink>
         </View>}
-        <PulseText size={20}>{day.toFormat('MMMM yyyy')}</PulseText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 6 }}>
-          <Button label="Previous week" onPress={() => setSelected(day.minus({ days: 7 }).toISODate()!)} />
-          <Button label="Today" onPress={() => setSelected(DateTime.now().setZone(zone).toISODate()!)} />
-          <Button label="Next week" onPress={() => setSelected(day.plus({ days: 7 }).toISODate()!)} />
-        </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 2 }}>
-          {Array.from({ length: 7 }, (_, index) => {
-            const date = first.plus({ days: index }), start = date.toMillis(), end = date.plus({ days: 1 }).toMillis();
-            const count = [...calendar.occurrences, ...calendar.events].filter(item => item.start < end && start < item.end).length;
-            const active = date.toISODate() === selected;
-            return <Pressable key={index} accessibilityRole="button" accessibilityLabel={`${date.toFormat('cccc, MMMM d')}, ${count} ${count === 1 ? 'entry' : 'entries'}`} accessibilityState={{ selected: active }} onPress={() => setSelected(date.toISODate()!)} style={{ flex: 1, minWidth: 44, minHeight: 80, paddingVertical: 10, paddingHorizontal: 2, gap: 4, borderRadius: 12, alignItems: 'center', backgroundColor: active ? C.pink : C.surface }}>
-              <PulseText size={12}>{date.toFormat('ccc')}</PulseText><PulseText size={18}>{date.day}</PulseText><PulseText size={11}>{count}</PulseText>
-            </Pressable>;
-          })}
-        </View>
         <PreviewLink href={{ pathname: '/schedule-entry', params: { date: selected } }} label="Add a class or commitment" style={{ minHeight: 48, padding: 12, borderRadius: 14, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' }}><PulseText>Add entry</PulseText></PreviewLink>
         <Message text={calendar.error} error />{calendar.error && <Button label="Retry calendar" onPress={refresh} />}{calendar.loading && <Loading />}
         {!!calendar.unknown.length && <Message text={`${calendar.unknown.length} RSVP(s) have unknown times or are unavailable. Availability cannot be confirmed.`} />}

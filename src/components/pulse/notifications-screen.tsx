@@ -9,6 +9,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { useNotifications } from '@/providers/notifications-provider';
 import { Screen, TitleHeader, PulseText } from './ui';
 import { Button, Message } from './schedule/controls';
+import DiscussionNotifications from './discussion-notifications';
 
 export default function NotificationsScreen() {
   const [page, setPage] = useState(0), [busy, setBusy] = useState(false);
@@ -34,6 +35,10 @@ export default function NotificationsScreen() {
         if (notification) query = query.eq('id', notification.id);
         const { error } = await query;
         if (error) throw new Error('Unable to mark notifications as read. Please try again.');
+        if (!notification) {
+          const discussion = await client.from('discussion_notifications').update({ read_at: new Date().toISOString() }).eq('user_id', user).is('read_at', null);
+          if (discussion.error && discussion.error.code !== '42P01' && discussion.error.code !== 'PGRST205') throw new Error('Unable to mark discussion notifications as read.');
+        }
       });
       badge.refresh();
       if (notification) router.push({ pathname: '/event', params: { id: notification.event_id } });
@@ -41,6 +46,7 @@ export default function NotificationsScreen() {
     finally { setBusy(false); }
   }
   return <Screen header={<TitleHeader title="Notifications" />}><View style={{ padding: 16, gap: 16 }}>
+    <DiscussionNotifications />
     <Button label="Mark all as read" disabled={busy || !badge.unread} onPress={() => void read()} />
     <Button label="Refresh" disabled={busy} onPress={() => { resource.refresh(); badge.refresh(); }} />
     <Message text={error} error />

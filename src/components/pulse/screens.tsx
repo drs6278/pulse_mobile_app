@@ -18,7 +18,8 @@ import {
 } from './ui';
 
 export function HomeScreen() {
-  return <Screen header={<SearchHeader home />} bottomBar activeTab="home"><EventFeed /></Screen>;
+  const { refresh, loading } = useEvents();
+  return <Screen header={<SearchHeader home />} bottomBar activeTab="home" onRefresh={refresh} refreshing={loading}><EventFeed /></Screen>;
 }
 
 export function CategoriesScreen() {
@@ -38,7 +39,8 @@ function CategoriesContent() {
 export const FiltersScreen = EventFiltersScreen;
 
 export function SearchScreen() {
-  return <Screen header={<SearchHeader />} bottomBar activeTab="home"><EventFeed /></Screen>;
+  const { refresh, loading } = useEvents();
+  return <Screen header={<SearchHeader />} bottomBar activeTab="home" onRefresh={refresh} refreshing={loading}><EventFeed /></Screen>;
 }
 
 export function SavedScreen() {

@@ -6,6 +6,7 @@ import { createContext, useContext, useSyncExternalStore, type ReactNode } from 
 import {
   Pressable,
   ScrollView,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -127,7 +128,7 @@ function ActionFace({ label }: { label: string }) {
   return <View style={{ width: 300 * s, height: 75 * s, borderRadius: 25 * s, backgroundColor: C.pink, alignItems: 'center', justifyContent: 'center' }}><PulseText size={32} color={C.white}>{label}</PulseText></View>;
 }
 
-export function Screen({ children, header, activeTab, bottomBar = false, action, actionHref, onAction, overlay, scroll = true }: {
+export function Screen({ children, header, activeTab, bottomBar = false, action, actionHref, onAction, overlay, scroll = true, onRefresh, refreshing = false }: {
   children: ReactNode;
   header: ReactNode;
   activeTab?: 'home' | 'saved' | 'create' | 'calendar';
@@ -137,6 +138,8 @@ export function Screen({ children, header, activeTab, bottomBar = false, action,
   onAction?: () => void;
   overlay?: ReactNode;
   scroll?: boolean;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   const { width } = useWindowDimensions();
   // Keep exported HTML and the first hydrated render identical; then fit the phone.
@@ -144,7 +147,7 @@ export function Screen({ children, header, activeTab, bottomBar = false, action,
   const s = Math.min(hydrated && width > 0 ? width : 402, 402) / 402;
   return <ScaleContext.Provider value={s}><View style={styles.backdrop}><SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { maxWidth: 402 }]}>
     {header}
-    {scroll ? <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, minHeight: (874 - 75 - (bottomBar ? 75 : action ? 105 : 0)) * s }} showsVerticalScrollIndicator={false}>
+    {scroll ? <ScrollView refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.pink} /> : undefined} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, minHeight: (874 - 75 - (bottomBar ? 75 : action ? 105 : 0)) * s }} showsVerticalScrollIndicator={false}>
       {children}
     </ScrollView> : <View style={{ flex: 1 }}>{children}</View>}
     {bottomBar && <BottomBar active={activeTab} />}

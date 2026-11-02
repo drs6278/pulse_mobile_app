@@ -4,6 +4,7 @@ import { usePreventRemove } from 'expo-router/react-navigation';
 import { Alert, Platform, View } from 'react-native';
 import { useUserResource } from '@/hooks/use-user-resource';
 import { canEditEvent, eventDraft, updateEvent } from '@/lib/event-edit';
+import { useEventPermission } from '@/hooks/use-event-permission';
 import { eventDetailsColumns, type PulseEvent } from '@/lib/event-query';
 import { profileSessionClient } from '@/lib/profile/repository';
 import { supabase } from '@/lib/supabase';
@@ -23,8 +24,6 @@ export default function EditEventScreen() {
     return data;
   }, [eventId]);
   const resource = useUserResource(loader);
-  // Foreground refreshes must not replace or unmount a draft being edited.
-  // The server revision check handles changes made after this snapshot opened.
   const [opened, setOpened] = useState<{ user: string; event: PulseEvent } | null>(null);
   const loaded = resource.data, user = resource.userId;
   const currentEvent = opened?.user === user && opened?.event.id === eventId
@@ -37,7 +36,7 @@ export default function EditEventScreen() {
   </View></Screen>;
 }
 function EditSession({ event, user }: { event: PulseEvent; user?: string }) {
-  const [eligible] = useState(() => canEditEvent(event, user));
+  const eligible = useEventPermission(event, user);
   return eligible ? <Editor event={event} /> : <PulseText>This event is unavailable for editing. Only the original poster can edit it before it starts.</PulseText>;
 }
 function Editor({ event }: { event: PulseEvent }) {
@@ -67,7 +66,8 @@ function Editor({ event }: { event: PulseEvent }) {
     return () => window.removeEventListener('beforeunload', prevent);
   }, [dirty, saved]);
   useEffect(() => { if (saved) router.replace({ pathname: '/event', params: { id: event.id } }); }, [saved, event.id]);
-  const allowed = canEditEvent(event, session?.user.id, now);
+  const clubAllowed = useEventPermission(event, session?.user.id);
+  const allowed = event.club_id ? clubAllowed && !!event.pulse_starts_at && Date.parse(event.pulse_starts_at) > now : canEditEvent(event, session?.user.id, now);
   async function save() {
     if (busy || !allowed) return;
     setBusy(true); setError(null);
