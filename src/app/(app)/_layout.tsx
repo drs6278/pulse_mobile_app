@@ -1,4 +1,5 @@
 import { NotificationsProvider } from '@/providers/notifications-provider';
+import { SavedEventsProvider } from '@/providers/saved-events-provider';
 import { Stack } from 'expo-router';
 
 import { PulseColors } from '@/constants/pulse-theme';
@@ -13,5 +14,5 @@ import { AccountBoundary } from '@/components/pulse/profile/account-boundary';
 // (see the Stack.Protected guard in the root layout).
 export default function AppLayout() {
   const { session } = useAuth();
-  return <ProfileProvider key={session?.user.id}><AccountBoundary><EventsProvider><ScheduleProvider><RSVPProvider><NotificationsProvider><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: PulseColors.background }, animation: 'none' }} /></NotificationsProvider></RSVPProvider></ScheduleProvider></EventsProvider></AccountBoundary></ProfileProvider>;
+  return <ProfileProvider key={session?.user.id}><AccountBoundary><EventsProvider><ScheduleProvider><RSVPProvider><NotificationsProvider><SavedEventsProvider><Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: PulseColors.background }, animation: 'none' }} /></SavedEventsProvider></NotificationsProvider></RSVPProvider></ScheduleProvider></EventsProvider></AccountBoundary></ProfileProvider>;
 }

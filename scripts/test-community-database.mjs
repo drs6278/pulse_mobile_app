@@ -1,0 +1,64 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import { PGlite } from '@electric-sql/pglite';
+
+const db = new PGlite();
+const alice = '00000000-0000-0000-0000-000000000001', bob = '00000000-0000-0000-0000-000000000002';
+const identity = async id => db.exec(`reset role; select set_config('request.jwt.claim.sub','${id}',false); set role authenticated`);
+try {
+ await db.exec(`create role anon; create role authenticated; create role service_role bypassrls;
+ create schema auth; create schema storage; create table auth.users(id uuid primary key);
+ create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+ create function auth.role() returns text language sql stable as $$ select current_setting('request.jwt.claim.role',true) $$;
+ grant usage on schema auth,public,storage to authenticated,anon,service_role;
+ grant execute on function auth.uid(),auth.role() to authenticated,anon,service_role;
+ insert into auth.users values('${alice}'),('${bob}');
+ create table public.events(id uuid primary key,title text,event_date date,location text,category text);
+ alter table public.events enable row level security; grant select on public.events to authenticated;
+ create policy event_read on public.events for select to authenticated using(true);
+ create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+ create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets(id),name text,unique(bucket_id,name));
+ alter table storage.objects enable row level security; grant select,insert,delete on storage.objects to authenticated;`);
+ for (const name of ['202610190001_scheduling','202610210001_event_creation','202610210003_schedule_review','202610230001_profiles','202610230002_profile_setup','202610280001_event_edit_notifications','202610280002_community']) {
+  await db.exec(await fs.readFile(new URL(`../supabase/migrations/${name}.sql`,import.meta.url),'utf8'));
+ }
+ await db.exec(`update public.private_profiles set profile_setup_completed_at=now(),age_band='21_plus'`);
+ await identity(alice);
+ const club = (await db.query(`select public.save_club($1::jsonb) id`,[JSON.stringify({name:'Chess',description:'Play chess',approval_required:true})])).rows[0].id;
+ const draft = { title:'Chess night',location:'Hall',category:'Other',event_date:'2099-01-01',pulse_starts_at:'2099-01-01T12:00:00Z',pulse_ends_at:'2099-01-01T13:00:00Z',pulse_timezone:'UTC',pulse_age_min:0 };
+ const event = (await db.query('select public.create_club_event($1,$2::jsonb) id',[club,JSON.stringify(draft)])).rows[0].id;
+ const cast = value => db.query('select * from public.set_community_vote($1,$2,$3::smallint)',['event',event,value]);
+ assert.equal((await cast(1)).rows[0].score,1);
+ assert.equal((await cast(-1)).rows[0].score,-1);
+ assert.equal((await cast(0)).rows[0].score,0);
+ await assert.rejects(db.query('select * from public.community_votes'),/permission denied/);
+ await assert.rejects(cast(2),/unavailable/);
+ const comment = (await db.query('select public.save_event_comment($1,$2) id',[event,'Hello'])).rows[0].id;
+ await identity(bob);
+ await assert.rejects(db.query('select public.create_club_event($1,$2::jsonb)',[club,JSON.stringify(draft)]),/administrator/);
+ await db.query('select public.manage_club_member($1,$2)',[club,'join']);
+ assert.equal((await db.query('select status from public.club_memberships where user_id=$1',[bob])).rows[0].status,'pending');
+ const reply = (await db.query('select public.save_event_comment($1,$2,$3) id',[event,'Reply',comment])).rows[0].id;
+ assert.equal((await db.query('select * from public.list_event_comments($1,$2)',[event,comment])).rows[0].id,reply);
+ assert.equal((await db.query('select public.get_discussion_comment($1,$2) row',[reply,event])).rows[0].row.id,reply);
+ assert.equal((await db.query('select public.get_discussion_comment($1,gen_random_uuid()) row',[reply])).rows[0].row,null);
+ await assert.rejects(db.query('select public.delete_event_comment($1)',[comment]),/cannot/);
+ await db.query('select public.report_event_comment($1,$2)',[comment,'Spam']);
+ await assert.rejects(db.query('select public.moderate_event_comment(gen_random_uuid(),true)'),/Moderator/);
+ await identity(alice);
+ assert.equal((await db.query('select * from public.list_discussion_notifications()')).rows.length,1);
+ await assert.rejects(db.query('select public.manage_club_member($1,$2)',[club,'leave']),/administrator/);
+ await db.query('select public.manage_club_member($1,$2,$3)',[club,'approve',bob]);
+ await db.query('select public.manage_club_member($1,$2,$3)',[club,'promote',bob]);
+ await identity(bob);
+ assert.equal((await db.query('select public.community_can_edit_event($1) allowed',[event])).rows[0].allowed,true);
+ await db.query('select public.edit_pulse_event($1,1,$2::jsonb)',[event,JSON.stringify({...draft,title:'Updated by second admin'})]);
+ await assert.rejects(db.query("update public.clubs set name='Spoof' where id=$1",[club]),/permission denied/);
+ await identity(alice);
+ await db.query('select public.delete_event_comment($1)',[comment]);
+ assert.equal((await db.query('select * from public.list_event_comments($1)',[event])).rows[0].body,'[Comment unavailable]');
+ assert.equal((await db.query('select * from public.list_event_comments($1,$2)',[event,comment])).rows[0].id,reply);
+ await db.query('select public.delete_club($1)',[club]);
+ assert.equal((await db.query('select pulse_cancelled from public.events where id=$1',[event])).rows[0].pulse_cancelled,true);
+ console.log('PASS community database: votes, privacy, nested replies, ownership, reports, notifications, membership, last admin, club deletion');
+} finally { await db.close(); }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
 import { buildEventSearch, defaultEventFilters, type EventFilters } from '@/lib/event-filters';
 import { EVENTS_PER_PAGE, fetchEvents, type PulseEvent } from '@/lib/event-query';
@@ -36,7 +36,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     if (!userId) return;
     const controller = new AbortController();
     let active = true;
-    void fetchEvents(supabase, request.search, request.page, controller.signal).then(data => {
+    void fetchEvents(supabase, request.search, request.page, controller.signal, request.filters.sort === 'top').then(data => {
       if (active) setResult({ ...data, request, userId, error: null });
     }).catch(() => {
       if (active) setResult({ request, userId, events: [], count: 0, error: 'Unable to load events. Please try again.' });
@@ -55,9 +55,9 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     // Keep the date bounds fixed while paging through the same search.
     setRequest(previous => ({ ...previous, page }));
   }
-  function refresh() {
-    applyFilters(request.filters);
-  }
+  const refresh = useCallback(() => {
+    setRequest(previous => ({ ...previous, search: { ...buildEventSearch(previous.filters), title: previous.title.trim() } }));
+  }, []);
   return <EventsContext.Provider value={{ filters: request.filters, titleSearch: request.title, applyFilters, setTitleSearch, events: current?.events ?? [], count: current?.count ?? 0, loading, error: current?.error ?? null, page: request.page, changePage, refresh }}>{children}</EventsContext.Provider>;
 }
 
