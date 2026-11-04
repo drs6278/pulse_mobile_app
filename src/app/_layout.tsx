@@ -35,13 +35,16 @@ function RootNavigator({ fontsReady }: { fontsReady: boolean }) {
     if (ready) void SplashScreen.hideAsync();
   }, [ready]);
   if (!ready) return <View style={{ flex: 1, backgroundColor: PulseColors.background }} />;
+  // When a guard flips, Expo Router falls back to the first available screen,
+  // so the protected groups must come before always-available screens like
+  // account-deletion — otherwise signing in lands there instead of the app.
   return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: PulseColors.background }, animation: 'none' }}>
-    <Stack.Screen name="account-deletion" />
     <Stack.Protected guard={!!session}>
       <Stack.Screen name="(app)" />
     </Stack.Protected>
     <Stack.Protected guard={!session}>
       <Stack.Screen name="login" />
     </Stack.Protected>
+    <Stack.Screen name="account-deletion" />
   </Stack>;
 }

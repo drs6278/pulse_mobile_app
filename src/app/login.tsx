@@ -59,7 +59,9 @@ export default function LoginScreen() {
     setSubmitting(false);
   };
 
-  return <SafeAreaView style={styles.screen}>
+  // Same phone-width frame as the shared Screen component, so on web this
+  // matches the rest of the app instead of stretching across the window.
+  return <View style={styles.backdrop}><SafeAreaView style={styles.frame}>
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <PulseText font="black" size={48} lineHeight={56} color={C.pink}>Pulse</PulseText>
@@ -121,10 +123,12 @@ export default function LoginScreen() {
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
-  </SafeAreaView>;
+  </SafeAreaView></View>;
 }
 
 const styles = StyleSheet.create({
+  backdrop: { flex: 1, backgroundColor: C.background, alignItems: 'center' },
+  frame: { flex: 1, width: '100%', maxWidth: 402, backgroundColor: C.background },
   screen: { flex: 1, backgroundColor: C.background },
   content: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 32 },
   subtitle: { marginTop: 8 },
