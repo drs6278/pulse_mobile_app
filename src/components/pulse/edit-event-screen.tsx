@@ -5,7 +5,9 @@ import { Alert, Platform, View } from 'react-native';
 import { useUserResource } from '@/hooks/use-user-resource';
 import { canEditEvent, eventDraft, updateEvent } from '@/lib/event-edit';
 import { useEventPermission } from '@/hooks/use-event-permission';
-import { eventDetailsColumns, type PulseEvent } from '@/lib/event-query';
+import { fetchEventById, type PulseEvent } from '@/lib/event-query';
+import { pickEventPhoto, removeEventPhoto, uploadEventPhoto, type PickedEventPhoto } from '@/lib/event-photo';
+import { EventPhotoField } from './event-photo-field';
 import { profileSessionClient } from '@/lib/profile/repository';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
@@ -18,11 +20,7 @@ import { Button, Message } from './schedule/controls';
 export default function EditEventScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const eventId = Array.isArray(id) ? id[0] : id;
-  const loader = useCallback(async (_user: string, signal: AbortSignal) => {
-    const { data, error } = await supabase.from('events').select(eventDetailsColumns).eq('id', eventId ?? '').abortSignal(signal).maybeSingle<PulseEvent>();
-    if (error) throw error;
-    return data;
-  }, [eventId]);
+  const loader = useCallback((_user: string, signal: AbortSignal) => fetchEventById(supabase, eventId ?? '', signal), [eventId]);
   const resource = useUserResource(loader);
   const [opened, setOpened] = useState<{ user: string; event: PulseEvent } | null>(null);
   const loaded = resource.data, user = resource.userId;
@@ -68,6 +66,27 @@ function Editor({ event }: { event: PulseEvent }) {
   useEffect(() => { if (saved) router.replace({ pathname: '/event', params: { id: event.id } }); }, [saved, event.id]);
   const clubAllowed = useEventPermission(event, session?.user.id);
   const allowed = event.club_id ? clubAllowed && !!event.pulse_starts_at && Date.parse(event.pulse_starts_at) > now : canEditEvent(event, session?.user.id, now);
+  // Photo changes apply immediately and don't touch the revision, so they never block Save.
+  const [photoPath, setPhotoPath] = useState(event.pulse_image_path ?? null);
+  const [pendingPhoto, setPendingPhoto] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false), [photoError, setPhotoError] = useState<string | null>(null);
+  async function changePhoto(next: 'pick' | 'remove') {
+    setPhotoError(null);
+    let picked: PickedEventPhoto | null = null;
+    if (next === 'pick') {
+      try { picked = await pickEventPhoto(); } catch (reason) { setPhotoError(reason instanceof Error ? reason.message : 'Unable to open your photos.'); return; }
+      if (!picked) return;
+      setPendingPhoto(picked.uri);
+    }
+    setPhotoBusy(true);
+    try {
+      const client = profileSessionClient(session?.access_token);
+      if (picked) setPhotoPath(await uploadEventPhoto(client, event.id, picked));
+      else { await removeEventPhoto(client, event.id); setPhotoPath(null); }
+      events.refresh();
+    } catch (reason) { setPhotoError(reason instanceof Error ? reason.message : 'Unable to update the photo.'); }
+    finally { setPendingPhoto(null); setPhotoBusy(false); }
+  }
   async function save() {
     if (busy || !allowed) return;
     setBusy(true); setError(null);
@@ -78,6 +97,7 @@ function Editor({ event }: { event: PulseEvent }) {
   }
   return <>
     {!allowed && <Message text="Only the original poster can edit an event, and only before it starts." error />}
+    {allowed && <EventPhotoField uri={pendingPhoto ?? undefined} path={photoPath} busy={photoBusy} error={photoError} onChoose={() => void changePhoto('pick')} onRemove={() => void changePhoto('remove')} />}
     <EventFormFields draft={draft} busy={busy || !allowed} change={values => { setDraft(previous => ({ ...previous, ...values })); setError(null); }} />
     <PulseText size={14}>Saving updates the event immediately and notifies Going attendees. Existing RSVPs are kept.</PulseText>
     <Message text={error} error />

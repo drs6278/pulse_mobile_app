@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 
 import { buildEventSearch, defaultEventFilters, type EventFilters } from '@/lib/event-filters';
 import { EVENTS_PER_PAGE, fetchEvents, type PulseEvent } from '@/lib/event-query';
@@ -55,9 +55,11 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     // Keep the date bounds fixed while paging through the same search.
     setRequest(previous => ({ ...previous, page }));
   }
-  function refresh() {
-    applyFilters(request.filters);
-  }
+  // Stable so screens can refresh from focus effects without re-triggering
+  // themselves on every render.
+  const refresh = useCallback(() => {
+    setRequest(previous => ({ ...previous, search: { ...buildEventSearch(previous.filters), title: previous.title.trim() }, page: 0 }));
+  }, []);
   return <EventsContext.Provider value={{ filters: request.filters, titleSearch: request.title, applyFilters, setTitleSearch, events: current?.events ?? [], count: current?.count ?? 0, loading, error: current?.error ?? null, page: request.page, changePage, refresh }}>{children}</EventsContext.Provider>;
 }
 
