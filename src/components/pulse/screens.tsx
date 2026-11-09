@@ -17,7 +17,7 @@ import { EventDateTimeFields } from './event-date-time-fields';
 import { EventPhotoField } from './event-photo-field';
 import { Button, Field, Message } from './schedule/controls';
 import {
-  EventRow, HeaderActions, Photo, PreviewLink, PulseIcon, PulseText, Screen,
+  HeaderActions, Photo, PreviewLink, PulseIcon, PulseText, Screen,
   SearchHeader, Tag, TitleHeader, usePulseScale,
 } from './ui';
 
@@ -47,17 +47,7 @@ export function SearchScreen() {
   return <Screen header={<SearchHeader />} bottomBar activeTab="home" onRefresh={refresh} refreshing={loading}><EventFeed /></Screen>;
 }
 
-export function SavedScreen() {
-  return <Screen header={<TitleHeader title="Saved events" back={false} right={<HeaderActions />} />} bottomBar activeTab="saved"><SavedContent /></Screen>;
-}
-
-function SavedContent() {
-  const s = usePulseScale();
-  return <View style={{ paddingHorizontal: 16 * s, paddingTop: 8 * s }}>
-    <EventRow title="Food" image={Images.saved} saved />
-    <EventRow title="Concert" image={Images.saved} saved />
-  </View>;
-}
+export { default as SavedScreen } from './saved-events-screen';
 
 function EventInfo({ map = false }: { map?: boolean }) {
   const s = usePulseScale();
@@ -179,7 +169,7 @@ export function ScreensIndex() {
 function PreviewContent() {
   const s = usePulseScale();
   return <View style={{ padding: 20 * s, gap: 12 * s }}>
-    <PulseText font="regular" color={C.muted} style={{ marginBottom: 8 * s }}>Calendar, imports, live event RSVPs, event browsing and event creation use Supabase. Saved events and map details remain previews.</PulseText>
+    <PulseText font="regular" color={C.muted} style={{ marginBottom: 8 * s }}>Calendar, imports, live event RSVPs, event browsing, event creation and saved events use Supabase. Map details remain previews.</PulseText>
     {previews.map(([href, label]) => <PreviewLink key={href} href={href} label={label} style={{ backgroundColor: C.surface, padding: 16 * s, borderRadius: 14 * s, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><PulseText size={18}>{label}</PulseText><PulseIcon name="next" size={24} color={C.pink} /></PreviewLink>)}
   </View>;
 }

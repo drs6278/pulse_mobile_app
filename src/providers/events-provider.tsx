@@ -36,7 +36,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     if (!userId) return;
     const controller = new AbortController();
     let active = true;
-    void fetchEvents(supabase, request.search, request.page, controller.signal).then(data => {
+    void fetchEvents(supabase, request.search, request.page, controller.signal, request.filters.sort === 'top').then(data => {
       if (active) setResult({ ...data, request, userId, error: null });
     }).catch(() => {
       if (active) setResult({ request, userId, events: [], count: 0, error: 'Unable to load events. Please try again.' });
@@ -55,10 +55,8 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     // Keep the date bounds fixed while paging through the same search.
     setRequest(previous => ({ ...previous, page }));
   }
-  // Stable so screens can refresh from focus effects without re-triggering
-  // themselves on every render.
   const refresh = useCallback(() => {
-    setRequest(previous => ({ ...previous, search: { ...buildEventSearch(previous.filters), title: previous.title.trim() }, page: 0 }));
+    setRequest(previous => ({ ...previous, search: { ...buildEventSearch(previous.filters), title: previous.title.trim() } }));
   }, []);
   return <EventsContext.Provider value={{ filters: request.filters, titleSearch: request.title, applyFilters, setTitleSearch, events: current?.events ?? [], count: current?.count ?? 0, loading, error: current?.error ?? null, page: request.page, changePage, refresh }}>{children}</EventsContext.Provider>;
 }

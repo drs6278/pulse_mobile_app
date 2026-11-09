@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
 
 export type PulseEvent = {
+  club_id?: string | null;
   id: string;
   title: string;
   event_date: string;
@@ -20,7 +21,7 @@ export type PulseEvent = {
 };
 // PostgREST casts avoid losing precision when an existing backend uses bigint IDs.
 export const eventColumns = 'id::text,title,event_date,location,category';
-export const eventDetailsColumns = `${eventColumns},pulse_starts_at,pulse_ends_at,pulse_timezone,pulse_cancelled,pulse_revision,pulse_all_day_start,pulse_all_day_end,created_by,pulse_age_min`;
+export const eventDetailsColumns = `${eventColumns},pulse_starts_at,pulse_ends_at,pulse_timezone,pulse_cancelled,pulse_revision,pulse_all_day_start,pulse_all_day_end,created_by,pulse_age_min,club_id`;
 export const EVENTS_PER_PAGE = 20;
 // Optional until the event-photo migration is applied everywhere.
 export const eventPhotoColumn = 'pulse_image_path';
@@ -67,7 +68,7 @@ export async function fetchCalendarCandidates(client: SupabaseClient, start: str
 
 type EventSearch = { categories: string[]; start: string; end: string | null; title: string };
 
-export async function fetchEvents(client: SupabaseClient, search: EventSearch, page: number, signal: AbortSignal) {
+export async function fetchEvents(client: SupabaseClient, search: EventSearch, page: number, signal: AbortSignal, top = false) {
   const first = page * EVENTS_PER_PAGE;
   const run = (columns: string) => {
     let query = client.from('events').select(columns, { count: 'exact' })
@@ -82,5 +83,10 @@ export async function fetchEvents(client: SupabaseClient, search: EventSearch, p
   if (response.error && missingColumn(response.error)) response = await run(eventColumns);
   const { data, error, count } = response;
   if (error) throw error;
+  if (top) {
+    const ranked = await client.rpc('list_top_events', { p_start: search.start, p_end: search.end, p_categories: search.categories, p_title: search.title, p_offset: first }).abortSignal(signal);
+    if (ranked.error) throw ranked.error;
+    return { events: (ranked.data ?? []) as PulseEvent[], count: count ?? 0 };
+  }
   return { events: data ?? [], count: count ?? 0 };
 }

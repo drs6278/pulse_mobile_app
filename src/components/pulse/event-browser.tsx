@@ -17,6 +17,7 @@ import { EventActions } from './schedule/event-actions';
 import { EventDiscussion, VoteButtons } from './community';
 import { summaries, type Engagement } from '@/lib/community';
 import { ProfileLink, ProfileMessage } from './profile/controls';
+import { SaveEventButton } from './save-event-button';
 
 function eventDateLabel(value: string) {
   const [year, month, day] = value.split('-').map(Number);
@@ -64,7 +65,7 @@ export function EventFeed() {
       {events.length === 0 && <View style={{ gap: 12 }}><PulseText size={20}>No matching events</PulseText><PulseText color={C.muted}>Try another category or date, or check back later.</PulseText><PreviewLink href="/filters" label="Change filters"><PulseText color={C.pink}>Change filters</PulseText></PreviewLink></View>}
       <ProfileLink href="/clubs" label="Discover clubs" />
       <ProfileMessage error text={voteError} />
-      {events.map(event => <View key={event.id} style={{ gap: PulseSpacing.sm }}><EventCard event={event} />{scores[event.id] && <><VoteButtons kind="event" value={scores[event.id]} onChange={value => setScores(previous => ({ ...previous, [event.id]: value }))} /><ProfileLink href={{ pathname: '/event', params: { id: event.id } }} label={`${scores[event.id].comment_count} comments and replies`} /></>}</View>)}
+      {events.map(event => <View key={event.id} style={{ gap: PulseSpacing.sm }}><EventCard event={event} /><SaveEventButton id={event.id} title={event.title} />{scores[event.id] && <><VoteButtons kind="event" value={scores[event.id]} onChange={value => setScores(previous => ({ ...previous, [event.id]: value }))} /><ProfileLink href={{ pathname: '/event', params: { id: event.id } }} label={`${scores[event.id].comment_count} comments and replies`} /></>}</View>)}
       {count > EVENTS_PER_PAGE && <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         {page > 0 ? <TextButton label="Previous" onPress={() => changePage(page - 1)} /> : <View />}
         <PulseText size={14}>Page {page + 1} of {Math.ceil(count / EVENTS_PER_PAGE)}</PulseText>
@@ -152,6 +153,7 @@ export function SupabaseEventScreen({ id, photoError }: { id: string; photoError
       {allowed && <PreviewLink href={{ pathname: '/edit-event', params: { id: event.id } }} label="Edit event" style={{ minHeight: 48, justifyContent: 'center' }}><PulseText color={C.pink}>Edit event</PulseText></PreviewLink>}
       {allowed && event.club_id && <TextButton label="Cancel club event" onPress={() => { void communityRpc('cancel_club_event', { p_event: event.id }).then(() => setRevision(v => v + 1)).catch(() => setResult({ key, event, error: 'Unable to cancel club event. Refresh and try again.' })); }} />}
       <EventActions key={String(event.id)} event={event} />
+      <SaveEventButton key={`save:${event.id}`} id={event.id} title={event.title} />
       <EventDiscussion key={`discussion:${session?.user.id}:${event.id}:${revision}`} eventId={event.id} />
     </>}
   </View></Screen>;
