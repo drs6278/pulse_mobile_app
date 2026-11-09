@@ -2,10 +2,10 @@ export const PulseColors = {
   background: '#0E1116',
   surface: '#20242D',
   search: '#181C23',
-  pink: '#FF4D8D',
+  pink: '#FF78A6',
   text: '#F5F7FA',
   white: '#FFFFFF',
-  muted: '#7B8291',
+  muted: '#A5ADBC',
   border: '#2B303A',
 } as const;
 

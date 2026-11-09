@@ -2,7 +2,7 @@ import { useNotifications } from '@/providers/notifications-provider';
 import { Image, type ImageSource } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link, router, type Href } from 'expo-router';
-import { createContext, useContext, useSyncExternalStore, type ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -11,7 +11,6 @@ import {
   Text,
   TextInput,
   View,
-  useWindowDimensions,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
@@ -23,9 +22,6 @@ import { useEvents } from '@/providers/events-provider';
 
 const ScaleContext = createContext(1);
 export const usePulseScale = () => useContext(ScaleContext);
-const subscribeToHydration = () => () => {};
-const clientSnapshot = () => true;
-const serverSnapshot = () => false;
 
 const icons = {
   bell: require('@/assets/figma/bell.svg'),
@@ -141,11 +137,9 @@ export function Screen({ children, header, activeTab, bottomBar = false, action,
   onRefresh?: () => void;
   refreshing?: boolean;
 }) {
-  const { width } = useWindowDimensions();
-  // Keep exported HTML and the first hydrated render identical; then fit the phone.
-  const hydrated = useSyncExternalStore(subscribeToHydration, clientSnapshot, serverSnapshot);
-  const s = Math.min(hydrated && width > 0 ? width : 402, 402) / 402;
-  return <ScaleContext.Provider value={s}><View style={styles.backdrop}><SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { maxWidth: 402 }]}>
+  // Preserve readable type and touch targets on narrow phones.
+  const s = 1;
+  return <ScaleContext.Provider value={s}><View style={styles.backdrop}><SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { maxWidth: 640 }]}>
     {header}
     {scroll ? <ScrollView refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.pink} /> : undefined} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, minHeight: (874 - 75 - (bottomBar ? 75 : action ? 105 : 0)) * s }} showsVerticalScrollIndicator={false}>
       {children}

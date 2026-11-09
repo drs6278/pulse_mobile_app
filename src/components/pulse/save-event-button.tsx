@@ -16,7 +16,7 @@ export function SaveEventButton({ id, title }: { id: string; title: string }) {
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save event.'); }
   }
   return <View style={{ gap: 6 }}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Unsave' : 'Save'} ${title}`} accessibilityState={{ selected, disabled }} disabled={disabled} onPress={() => void toggle()} style={{ minHeight: 48, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8, opacity: disabled ? 0.5 : 1 }}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Unsave' : 'Save'} ${title}`} accessibilityHint={selected ? 'Remove this event from Saved Events' : 'Keep this event in Saved Events to find it later'} accessibilityState={{ selected, disabled }} disabled={disabled} onPress={() => void toggle()} style={({ pressed }) => ({ minHeight: 48, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: C.pink, backgroundColor: selected ? C.surface : 'transparent', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: disabled ? 0.5 : pressed ? 0.7 : 1 })}>
       <PulseIcon name={selected ? 'bookmarkFilled' : 'bookmark'} color={C.pink} size={24} />
       <PulseText size={14}>{selected ? 'Saved' : 'Save event'}</PulseText>
     </Pressable>
