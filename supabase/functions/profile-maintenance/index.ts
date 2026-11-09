@@ -2,7 +2,7 @@
 /* global Deno */
 /* eslint-disable import/no-unresolved */
 import { adminClient, respond } from '../_shared/profile/http.ts';
-import { cleanupProfileAvatars, processProfileDeletions } from '../_shared/profile/core.mjs';
+import { cleanupEventPhotos, cleanupProfileAvatars, processProfileDeletions } from '../_shared/profile/core.mjs';
 
 // Scheduler only. Deploy --no-verify-jwt; authenticate with a separate server secret.
 Deno.serve(async request => {
@@ -13,6 +13,8 @@ Deno.serve(async request => {
     const client = adminClient();
     const deletions = await processProfileDeletions(client);
     const avatars = await cleanupProfileAvatars(client);
-    return respond({ ...deletions, ...avatars }, deletions.failed ? 503 : 200);
+    // Isolated so a project without the event-photo migration keeps processing deletions.
+    const photos = await cleanupEventPhotos(client).catch(() => ({ eventPhotosFailed: true }));
+    return respond({ ...deletions, ...avatars, ...photos }, deletions.failed ? 503 : 200);
   } catch { return respond({ error: 'Maintenance failed. Retry on the next scheduled run.' }, 503); }
 });

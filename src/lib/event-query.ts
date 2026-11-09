@@ -17,11 +17,27 @@ export type PulseEvent = {
   pulse_revision?: number;
   pulse_all_day_start?: string | null;
   pulse_all_day_end?: string | null;
+  pulse_image_path?: string | null;
 };
 // PostgREST casts avoid losing precision when an existing backend uses bigint IDs.
 export const eventColumns = 'id::text,title,event_date,location,category';
 export const eventDetailsColumns = `${eventColumns},pulse_starts_at,pulse_ends_at,pulse_timezone,pulse_cancelled,pulse_revision,pulse_all_day_start,pulse_all_day_end,created_by,pulse_age_min,club_id`;
 export const EVENTS_PER_PAGE = 20;
+// Optional until the event-photo migration is applied everywhere.
+export const eventPhotoColumn = 'pulse_image_path';
+const missingColumn = (error: { code?: string } | null) => ['42703', 'PGRST204'].includes(error?.code ?? '');
+
+// Loads one event with as much detail as the server supports. `allowBasic`
+// accepts servers without scheduling columns, for read-only screens.
+export async function fetchEventById(client: SupabaseClient, id: string, signal: AbortSignal, { allowBasic = false } = {}) {
+  const attempts = [`${eventDetailsColumns},${eventPhotoColumn}`, eventDetailsColumns, ...(allowBasic ? [eventColumns] : [])];
+  for (const [index, columns] of attempts.entries()) {
+    const { data, error } = await client.from('events').select(columns).eq('id', id).abortSignal(signal).maybeSingle<PulseEvent>();
+    if (!error) return data;
+    if (!missingColumn(error) || index === attempts.length - 1) throw error;
+  }
+  return null;
+}
 
 export function eventInterval(event: PulseEvent) {
   if (event.pulse_all_day_start && event.pulse_all_day_end) {
@@ -53,14 +69,19 @@ export async function fetchCalendarCandidates(client: SupabaseClient, start: str
 type EventSearch = { categories: string[]; start: string; end: string | null; title: string };
 
 export async function fetchEvents(client: SupabaseClient, search: EventSearch, page: number, signal: AbortSignal, top = false) {
-  let query = client.from('events').select(eventColumns, { count: 'exact' })
-    .gte('event_date', search.start)
-    .order('event_date', { ascending: true }).order('id', { ascending: true });
-  if (search.categories.length) query = query.in('category', search.categories);
-  if (search.end) query = query.lte('event_date', search.end);
-  if (search.title) query = query.ilike('title', `%${search.title}%`);
   const first = page * EVENTS_PER_PAGE;
-  const { data, error, count } = await query.range(first, first + EVENTS_PER_PAGE - 1).abortSignal(signal).returns<PulseEvent[]>();
+  const run = (columns: string) => {
+    let query = client.from('events').select(columns, { count: 'exact' })
+      .gte('event_date', search.start)
+      .order('event_date', { ascending: true }).order('id', { ascending: true });
+    if (search.categories.length) query = query.in('category', search.categories);
+    if (search.end) query = query.lte('event_date', search.end);
+    if (search.title) query = query.ilike('title', `%${search.title}%`);
+    return query.range(first, first + EVENTS_PER_PAGE - 1).abortSignal(signal).returns<PulseEvent[]>();
+  };
+  let response = await run(`${eventColumns},${eventPhotoColumn}`);
+  if (response.error && missingColumn(response.error)) response = await run(eventColumns);
+  const { data, error, count } = response;
   if (error) throw error;
   if (top) {
     const ranked = await client.rpc('list_top_events', { p_start: search.start, p_end: search.end, p_categories: search.categories, p_title: search.title, p_offset: first }).abortSignal(signal);

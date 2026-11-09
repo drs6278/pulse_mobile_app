@@ -3,11 +3,13 @@ import { communityRpc } from '@/lib/community';
 import { useAuth } from '@/providers/auth-provider';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-import { PulseColors as C } from '@/constants/pulse-theme';
+import { PulseColors as C, PulseRadius, PulseSpacing } from '@/constants/pulse-theme';
 import { dateOptions, defaultEventFilters, eventCategories, validateEventFilters, type EventFilters } from '@/lib/event-filters';
-import { eventColumns, eventDetailsColumns, EVENTS_PER_PAGE, type PulseEvent } from '@/lib/event-query';
+import { EVENTS_PER_PAGE, fetchEventById, type PulseEvent } from '@/lib/event-query';
+import { EventPhoto } from './ui/event-photo';
+import { InlineMessage } from './ui/feedback';
 import { supabase } from '@/lib/supabase';
 import { useEvents } from '@/providers/events-provider';
 import { PreviewLink, PulseText, Screen, TitleHeader, usePulseScale } from './ui';
@@ -17,11 +19,33 @@ import { summaries, type Engagement } from '@/lib/community';
 import { ProfileLink, ProfileMessage } from './profile/controls';
 import { SaveEventButton } from './save-event-button';
 
-function EventDate({ value }: { value: string }) {
+function eventDateLabel(value: string) {
   const [year, month, day] = value.split('-').map(Number);
-  const localDate = new Date(year, month - 1, day);
-  return <PulseText size={14} color={C.muted}>{localDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</PulseText>;
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
+
+function EventDate({ value }: { value: string }) {
+  return <PulseText size={14} color={C.muted}>{eventDateLabel(value)}</PulseText>;
+}
+
+// With a photo, the photo fills the card and the text sits on a scrim at the bottom.
+function EventCard({ event }: { event: PulseEvent }) {
+  const photo = event.pulse_image_path;
+  return <PreviewLink href={{ pathname: '/event', params: { id: event.id } }} label={`Open ${event.title}`} style={[cardStyles.card, photo ? cardStyles.photoCard : null]}>
+    {photo && <EventPhoto path={photo} scrim style={StyleSheet.absoluteFill} />}
+    <View style={cardStyles.body}>
+      <PulseText variant="label" tone="accent">{event.category}</PulseText>
+      <PulseText variant="title" numberOfLines={2}>{event.title}</PulseText>
+      <PulseText variant="label" tone={photo ? 'default' : 'muted'} numberOfLines={1}>{eventDateLabel(event.event_date)} · {event.location}</PulseText>
+    </View>
+  </PreviewLink>;
+}
+
+const cardStyles = StyleSheet.create({
+  card: { borderRadius: PulseRadius.lg, overflow: 'hidden', backgroundColor: C.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: C.border },
+  photoCard: { minHeight: 220, justifyContent: 'flex-end' },
+  body: { padding: PulseSpacing.lg, gap: PulseSpacing.xs },
+});
 
 function TextButton({ label, onPress }: { label: string; onPress: () => void }) {
   return <Pressable accessibilityRole="button" onPress={onPress} style={{ minHeight: 44, justifyContent: 'center' }}><PulseText color={C.pink}>{label}</PulseText></Pressable>;
@@ -41,9 +65,7 @@ export function EventFeed() {
       {events.length === 0 && <View style={{ gap: 12 }}><PulseText size={20}>No matching events</PulseText><PulseText color={C.muted}>Try another category or date, or check back later.</PulseText><PreviewLink href="/filters" label="Change filters"><PulseText color={C.pink}>Change filters</PulseText></PreviewLink></View>}
       <ProfileLink href="/clubs" label="Discover clubs" />
       <ProfileMessage error text={voteError} />
-      {events.map(event => <View key={event.id}><PreviewLink href={{ pathname: '/event', params: { id: event.id } }} label={`Open ${event.title}`} style={{ borderRadius: 20 * s, overflow: 'hidden', backgroundColor: C.surface }}>
-        <View style={{ padding: 16 * s, gap: 8 }}><PulseText size={14} color={C.pink}>{event.category}</PulseText><PulseText size={24} font="black">{event.title}</PulseText><EventDate value={event.event_date} /><PulseText size={14} color={C.muted}>{event.location}</PulseText></View>
-      </PreviewLink><SaveEventButton id={event.id} title={event.title} />{scores[event.id] && <><VoteButtons kind="event" value={scores[event.id]} onChange={value => setScores(previous => ({ ...previous, [event.id]: value }))} /><ProfileLink href={{ pathname: '/event', params: { id: event.id } }} label={`${scores[event.id].comment_count} comments and replies`} /></>}</View>)}
+      {events.map(event => <View key={event.id} style={{ gap: PulseSpacing.sm }}><EventCard event={event} /><SaveEventButton id={event.id} title={event.title} />{scores[event.id] && <><VoteButtons kind="event" value={scores[event.id]} onChange={value => setScores(previous => ({ ...previous, [event.id]: value }))} /><ProfileLink href={{ pathname: '/event', params: { id: event.id } }} label={`${scores[event.id].comment_count} comments and replies`} /></>}</View>)}
       {count > EVENTS_PER_PAGE && <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         {page > 0 ? <TextButton label="Previous" onPress={() => changePage(page - 1)} /> : <View />}
         <PulseText size={14}>Page {page + 1} of {Math.ceil(count / EVENTS_PER_PAGE)}</PulseText>
@@ -93,7 +115,7 @@ export function EventFiltersScreen() {
   </Screen>;
 }
 
-export function SupabaseEventScreen({ id }: { id: string }) {
+export function SupabaseEventScreen({ id, photoError }: { id: string; photoError?: string }) {
   const { session } = useAuth();
   const [result, setResult] = useState<{ key: string; event: PulseEvent | null; error: string | null } | null>(null);
   const [revision, setRevision] = useState(0);
@@ -109,11 +131,8 @@ export function SupabaseEventScreen({ id }: { id: string }) {
     let active = true;
     void (async () => {
       try {
-        let response = await supabase.from('events').select(eventDetailsColumns).eq('id', id).abortSignal(controller.signal).maybeSingle<PulseEvent>();
         // Existing discovery/details remain usable before scheduling is deployed.
-        if (response.error && ['42703', 'PGRST204'].includes(response.error.code)) response = await supabase.from('events').select(eventColumns).eq('id', id).abortSignal(controller.signal).maybeSingle<PulseEvent>();
-        const { data, error: queryError } = response;
-        if (queryError) throw queryError;
+        const data = await fetchEventById(supabase, id, controller.signal, { allowBasic: true });
         if (active) setResult({ key, event: data, error: data ? null : 'This event is no longer available.' });
       } catch {
         if (active) setResult({ key, event: null, error: 'Unable to load this event. Please try again.' });
@@ -122,7 +141,9 @@ export function SupabaseEventScreen({ id }: { id: string }) {
     return () => { active = false; controller.abort(); };
   }, [id, key]);
   return <Screen onRefresh={() => setRevision(value => value + 1)} refreshing={loading} header={<TitleHeader title="Event details" right={<TextButton label="Refresh" onPress={() => setRevision(value => value + 1)} />} />}><View style={{ padding: 16, gap: 16 }}>
+    <InlineMessage text={photoError ? `Your event was posted, but the photo didn’t upload: ${photoError} You can add it from Edit event.` : null} error />
     {loading ? <ActivityIndicator accessibilityLabel="Loading event" color={C.pink} /> : error ? <View accessibilityRole="alert"><PulseText>{error}</PulseText><TextButton label="Try again" onPress={() => setRevision(value => value + 1)} /></View> : event && <>
+      {event.pulse_image_path && <EventPhoto path={event.pulse_image_path} style={{ height: 220, borderRadius: PulseRadius.lg }} />}
       <PulseText color={C.pink}>{event.category}</PulseText><PulseText size={28} font="black">{event.title}</PulseText><EventDate value={event.event_date} /><PulseText>{event.location}</PulseText>
       {!!event.pulse_age_min && <PulseText size={14}>{event.pulse_age_min}+ · Self-reported age eligibility required</PulseText>}
       {event.created_by && <PreviewLink href={{ pathname: '/student-profile', params: { id: event.created_by } }} label="View organizer profile" style={{ minHeight: 48, justifyContent: 'center' }}><PulseText color={C.pink}>View organizer profile ›</PulseText></PreviewLink>}

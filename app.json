@@ -38,7 +38,15 @@
           "calendarPermission": "Pulse uses calendar access only when you export, update, or remove a Pulse event in a calendar you select."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Pulse uses your photo library only when you choose a photo for an event.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -7,13 +7,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PulseColors as C, PulseImages as Images } from '@/constants/pulse-theme';
 import { createEvent, defaultEventDraft, type EventDraft } from '@/lib/event-create';
 import { eventCategories } from '@/lib/event-filters';
+import { pickEventPhoto, uploadEventPhoto, type PickedEventPhoto } from '@/lib/event-photo';
+import { profileSessionClient } from '@/lib/profile/repository';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/providers/auth-provider';
 import { useEvents } from '@/providers/events-provider';
 import { EventFeed, EventFiltersScreen, FilterGroup, SupabaseEventScreen } from './event-browser';
 import { EventDateTimeFields } from './event-date-time-fields';
+import { EventPhotoField } from './event-photo-field';
 import { Button, Field, Message } from './schedule/controls';
 import {
-  Photo, PreviewLink, PulseIcon, PulseText, Screen,
+  HeaderActions, Photo, PreviewLink, PulseIcon, PulseText, Screen,
   SearchHeader, Tag, TitleHeader, usePulseScale,
 } from './ui';
 
@@ -54,16 +58,16 @@ function EventInfo({ map = false }: { map?: boolean }) {
       <PulseText size={16} color={C.white} lineHeight={29} style={{ marginTop: 6 * s }}>9:00pm - Junker</PulseText>
     </View>
     {map ? <>
-      <View style={{ position: 'absolute', right: 11 * s, top: 21 * s }}><PreviewLink href="/event" label="Open basketball details"><PulseIcon name="next" size={48} /></PreviewLink></View>
+      <View style={{ position: 'absolute', right: 11 * s, top: 21 * s }}><PreviewLink href="/event" label="Open basketball details"><PulseIcon name="next" /></PreviewLink></View>
       <View accessibilityLabel="Saved event" style={{ position: 'absolute', right: 16 * s, bottom: 10 * s }}><PulseIcon name="bookmarkFilled" color={C.pink} /></View>
-    </> : <View style={{ position: 'absolute', right: 17 * s, bottom: 17 * s }}><PreviewLink href="/map" label="Preview event map"><PulseIcon name="map" size={48} /></PreviewLink></View>}
+    </> : <View style={{ position: 'absolute', right: 17 * s, bottom: 17 * s }}><PreviewLink href="/map" label="Preview event map"><PulseIcon name="map" /></PreviewLink></View>}
   </View>;
 }
 
 export function EventScreen() {
-  const { id } = useLocalSearchParams<{ id?: string | string[] }>();
+  const { id, photoError } = useLocalSearchParams<{ id?: string | string[]; photoError?: string }>();
   const eventId = Array.isArray(id) ? id[0] : id;
-  if (eventId) return <SupabaseEventScreen id={eventId} />;
+  if (eventId) return <SupabaseEventScreen id={eventId} photoError={photoError} />;
   return <Screen header={<TitleHeader title="Pick up Basketball" right={<PulseIcon name="bookmarkFilled" color={C.pink} />} />} action="RSVP"><EventContent /></Screen>;
 }
 
@@ -79,25 +83,39 @@ function EventContent() {
 }
 
 export function CreateScreen() {
-  return <Screen header={<SearchHeader />} bottomBar activeTab="create"><CreateContent /></Screen>;
+  return <Screen header={<TitleHeader title="Create event" back={false} right={<HeaderActions />} />} bottomBar activeTab="create"><CreateContent /></Screen>;
 }
 
 function CreateContent() {
   const s = usePulseScale();
   const { refresh } = useEvents();
+  const { session } = useAuth();
   const [draft, setDraft] = useState(() => defaultEventDraft());
+  const [photo, setPhoto] = useState<PickedEventPhoto | null>(null);
   const [error, setError] = useState<string | null>(null), [busy, setBusy] = useState(false);
   const change = (values: Partial<EventDraft>) => { setDraft(previous => ({ ...previous, ...values })); setError(null); };
+  async function choosePhoto() {
+    setError(null);
+    try { const picked = await pickEventPhoto(); if (picked) setPhoto(picked); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to open your photos.'); }
+  }
   async function post() {
     setBusy(true); setError(null);
-    try {
-      const id = await createEvent(supabase, draft);
-      refresh();
-      router.replace({ pathname: '/event', params: { id } });
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to post event.'); setBusy(false); }
+    let id: string;
+    try { id = await createEvent(supabase, draft); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to post event.'); setBusy(false); return; }
+    // The event is live from here on, so a photo failure must not offer a repost.
+    let photoError: string | undefined;
+    if (photo) {
+      try { await uploadEventPhoto(profileSessionClient(session?.access_token), id, photo); }
+      catch (reason) { photoError = reason instanceof Error ? reason.message : 'Unable to upload the photo.'; }
+    }
+    refresh();
+    setDraft(defaultEventDraft()); setPhoto(null); setBusy(false);
+    router.replace({ pathname: '/event', params: photoError ? { id, photoError } : { id } });
   }
   return <View style={{ padding: 16 * s, gap: 16 }}>
-    <PulseText font="black" size={24} color={C.white} lineHeight={32}>Create an Event</PulseText>
+    <EventPhotoField uri={photo?.uri} busy={busy} onChoose={() => void choosePhoto()} onRemove={() => setPhoto(null)} />
     <EventFormFields draft={draft} busy={busy} change={change} />
     <Message text={error} error />
     <Button label={busy ? 'Posting…' : 'Post event'} onPress={() => void post()} disabled={busy} />
@@ -130,9 +148,9 @@ function MapContent() {
   return <View>
     <View style={{ marginTop: 10 * s, marginLeft: 28 * s, width: 345 * s, height: 248 * s, borderRadius: 25 * s, borderWidth: 3 * s, borderColor: C.border, overflow: 'hidden' }}>
       <Image source={Images.map} style={{ position: 'absolute', left: '-27.82%', top: 0, width: '130.47%', height: '124.55%' }} contentFit="fill" />
-      <View style={{ position: 'absolute', top: 73 * s, left: 103 * s }}><PulseIcon name="pinPink" size={48} color={C.pink} /></View>
+      <View style={{ position: 'absolute', top: 73 * s, left: 103 * s }}><PulseIcon name="pinPink" size={32} color={C.pink} /></View>
     </View>
-    <View style={{ marginTop: 22 * s, marginLeft: 36 * s, height: 48 * s, flexDirection: 'row', alignItems: 'center', gap: 16 * s }}><PulseIcon name="pin" size={48} /><PulseText size={16} color={C.white} lineHeight={20}>Junker main gym</PulseText></View>
+    <View style={{ marginTop: 22 * s, marginLeft: 36 * s, height: 48 * s, flexDirection: 'row', alignItems: 'center', gap: 16 * s }}><PulseIcon name="pin" /><PulseText size={16} color={C.white} lineHeight={20}>Junker main gym</PulseText></View>
     <View style={{ marginTop: 22 * s, marginRight: 6 * s }}><EventInfo map /></View>
   </View>;
 }

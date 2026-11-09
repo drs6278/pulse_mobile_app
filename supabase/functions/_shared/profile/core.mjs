@@ -85,6 +85,13 @@ export async function processProfileDeletions(client, limit = 5) {
   }
   return { completed, failed };
 }
+// Removes event photos no event references (see claim_event_photo_cleanup).
+export async function cleanupEventPhotos(client) {
+  const rows = checked(await client.rpc('claim_event_photo_cleanup')) ?? [];
+  const paths = rows.map(row => row.path).filter(path => typeof path === 'string' && path.length > 0);
+  if (paths.length) checked(await client.storage.from('event-photos').remove(paths));
+  return { eventPhotosRemoved: paths.length };
+}
 export async function cleanupProfileAvatars(client) {
   const objects = checked(await client.rpc('claim_profile_avatar_cleanup'));
   let removed = 0;
