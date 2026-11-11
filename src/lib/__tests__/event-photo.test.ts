@@ -44,7 +44,7 @@ describe('pickEventPhoto', () => {
 });
 
 function functionsClient(result: { data?: unknown; error?: unknown }) {
-  const invoke = jest.fn(async () => ({ data: null, error: null, ...result }));
+  const invoke = jest.fn(async (..._args: unknown[]) => ({ data: null, error: null, ...result }));
   return { client: { functions: { invoke } } as unknown as SupabaseClient, invoke };
 }
 

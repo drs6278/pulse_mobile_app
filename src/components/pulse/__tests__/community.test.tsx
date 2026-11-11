@@ -18,20 +18,20 @@ beforeEach(() => { jest.resetAllMocks(); });
 test('upvotes, switches direction, and removes the selected vote', async () => {
   const cast = jest.mocked(vote);
   cast.mockResolvedValueOnce([{ id: 'event', score: 1, my_vote: 1, comment_count: 0 }]).mockResolvedValueOnce([{ id: 'event', score: -1, my_vote: -1, comment_count: 0 }]).mockResolvedValueOnce([{ id: 'event', score: 0, my_vote: 0, comment_count: 0 }]);
-  const screen = render(<Harness />);
-  fireEvent.press(screen.getByLabelText('Upvote'));
+  const screen = await render(<Harness />);
+  await fireEvent.press(screen.getByLabelText('Upvote'));
   await waitFor(() => expect(screen.getByLabelText('Upvote')).not.toBeDisabled());
   expect(cast).toHaveBeenLastCalledWith('event', 'event', 1);
-  fireEvent.press(screen.getByLabelText('Downvote'));
+  await fireEvent.press(screen.getByLabelText('Downvote'));
   await waitFor(() => expect(screen.getByLabelText('Downvote')).not.toBeDisabled());
   expect(cast).toHaveBeenLastCalledWith('event', 'event', -1);
-  fireEvent.press(screen.getByLabelText('Downvote'));
+  await fireEvent.press(screen.getByLabelText('Downvote'));
   await waitFor(() => expect(cast).toHaveBeenLastCalledWith('event', 'event', 0));
 });
 test('rolls back optimistic votes after a network failure', async () => {
   jest.mocked(vote).mockRejectedValueOnce(new Error('Connection failed'));
-  const screen = render(<Harness />);
-  fireEvent.press(screen.getByLabelText('Upvote'));
+  const screen = await render(<Harness />);
+  await fireEvent.press(screen.getByLabelText('Upvote'));
   await waitFor(() => expect(screen.getByText('Connection failed')).toBeTruthy());
   expect(screen.getByText('0 points')).toBeTruthy();
 });

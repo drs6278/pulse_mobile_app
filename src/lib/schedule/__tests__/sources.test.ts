@@ -14,9 +14,9 @@ const result = { candidates: [], errors: [], warnings: [] };
 
 describe('private source lifecycle', () => {
   test('uploads original bytes, invokes the authenticated parser, and does not commit', async () => {
-    const upload = jest.fn(async () => ({ error: null }));
-    const invoke = jest.fn(async () => ({ data: result, error: null }));
-    const rpc = jest.fn(async () => ({ data: source, error: null }));
+    const upload = jest.fn(async (..._args: unknown[]) => ({ error: null }));
+    const invoke = jest.fn(async (..._args: unknown[]) => ({ data: result, error: null }));
+    const rpc = jest.fn(async (..._args: unknown[]) => ({ data: source, error: null }));
     const client = { rpc, storage: { from: () => ({ upload }) }, functions: { invoke } } as unknown as SupabaseClient;
     const encoded = utf8Bytes(csv), backing = new Uint8Array(encoded.length + 8);
     backing.set(encoded,4);
@@ -29,7 +29,7 @@ describe('private source lifecycle', () => {
   test('parser failure queues cleanup before removing the source', async () => {
     const calls: string[] = [];
     const rpc = jest.fn(async (name: string) => { calls.push(name); return { data: source, error: null }; });
-    const remove = jest.fn(async () => { calls.push('remove'); return { error: null }; });
+    const remove = jest.fn(async (..._args: unknown[]) => { calls.push('remove'); return { error: null }; });
     const client = { rpc, storage: { from: () => ({ upload: async () => ({ error:null }), remove }) }, functions: { invoke: async () => ({ error: { context: { json: async () => ({error:'Unsupported CSV columns: unexpected.'}) } } }) } } as unknown as SupabaseClient;
     await expect(prepareScheduleSource(client,{name:'fall.csv',text:csv},'UTC','2026-12-01')).rejects.toThrow('Unsupported CSV columns');
     expect(calls).toEqual(['create_schedule_source','discard_schedule_source','remove','finish_schedule_source_cleanup']);
@@ -49,11 +49,11 @@ describe('private source lifecycle', () => {
 
 function processor(options: { type?: string; bytes?: Uint8Array<ArrayBuffer>; expired?: boolean; missing?: boolean } = {}) {
   const bytes = options.bytes ?? utf8Bytes(csv);
-  const rpc = jest.fn(async () => ({error:null}));
+  const rpc = jest.fn(async (..._args: unknown[]) => ({error:null}));
   const eq = jest.fn();
   const query = { eq, single: async () => ({data:options.missing ? null : {...source,user_id:user,created_at:new Date(Date.now()-(options.expired ? 90000000 : 0)).toISOString(),cleanup_requested:false},error:null}) };
   eq.mockReturnValue(query);
-  const download = jest.fn(async()=>({data:{size:bytes.byteLength,type:options.type ?? 'text/csv',arrayBuffer:async()=>bytes.buffer},error:null}));
+  const download = jest.fn(async(..._args: unknown[])=>({data:{size:bytes.byteLength,type:options.type ?? 'text/csv',arrayBuffer:async()=>bytes.buffer},error:null}));
   const client = { rpc, from:()=>({select:()=>query}), storage:{from:()=>({download})} } as unknown as SupabaseClient;
   return {client,rpc,download,eq};
 }
@@ -75,7 +75,7 @@ describe('backend processing and cleanup', () => {
     }
   });
   test('cleanup failures preserve the ledger and successful removals finish cleanup', async () => {
-    const rpc = jest.fn(async()=>({error:null}));
+    const rpc = jest.fn(async(..._args: unknown[])=>({error:null}));
     const remove = jest.fn(async (paths: string[])=>({error:paths[0]==='failed.csv' ? new Error('Storage unavailable') : null}));
     const query = {or:()=>query,order:()=>query,limit:async()=>({data:[{id:'fail',object_path:'failed.csv'},{id:'ok',object_path:'ok.csv'}],error:null})};
     const client = {rpc,from:()=>({select:()=>query}),storage:{from:()=>({remove})}} as unknown as SupabaseClient;

@@ -1,7 +1,7 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { DateTime } from 'luxon';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, View } from 'react-native';
+import { Platform, View, type ViewInstance } from 'react-native';
 
 import { PulseColors as C } from '@/constants/pulse-theme';
 import { validZone } from '@/lib/schedule/time';
@@ -19,7 +19,7 @@ export type EventDateTimeInputProps = {
 
 export function EventDateTimeInput({ label, value, timezone, disabled, onChange, mode: inputMode, focusRequest }: EventDateTimeInputProps) {
   const [mode, setMode] = useState<'date' | 'time' | null>(null);
-  const dateRef = useRef<View>(null), timeRef = useRef<View>(null);
+  const dateRef = useRef<ViewInstance>(null), timeRef = useRef<ViewInstance>(null);
   const focusId = focusRequest?.id, focusMode = focusRequest?.mode;
   useEffect(() => { if (focusId) (focusMode === 'date' ? dateRef : timeRef).current?.focus(); }, [focusId, focusMode]);
   const parsed = DateTime.fromISO(value, { zone: timezone });

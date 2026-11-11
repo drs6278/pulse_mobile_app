@@ -21,18 +21,18 @@ function RefreshOnFocus() {
 }
 
 test('refreshing from a focus effect settles instead of looping', async () => {
-  render(<RefreshOnFocus />, { wrapper });
+  await render(<RefreshOnFocus />, { wrapper });
   await waitFor(() => expect(mockFetch).toHaveBeenCalled());
   expect(mockFetch.mock.calls.length).toBeLessThanOrEqual(2);
 });
 
 test('refresh keeps its identity and the latest filters', async () => {
-  const { result } = renderHook(() => useEvents(), { wrapper });
+  const { result } = await renderHook(() => useEvents(), { wrapper });
   await waitFor(() => expect(result.current.loading).toBe(false));
   const refresh = result.current.refresh;
-  act(() => result.current.applyFilters({ ...defaultEventFilters, categories: ['Music'] }));
+  await act(() => result.current.applyFilters({ ...defaultEventFilters, categories: ['Music'] }));
   await waitFor(() => expect(result.current.loading).toBe(false));
-  act(() => refresh());
+  await act(() => refresh());
   await waitFor(() => expect(result.current.loading).toBe(false));
   expect(result.current.refresh).toBe(refresh);
   expect(result.current.filters.categories).toEqual(['Music']);

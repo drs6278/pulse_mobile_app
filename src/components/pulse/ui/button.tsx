@@ -1,6 +1,6 @@
 import { Link, type Href } from 'expo-router';
 import type { Ref } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View, type ViewInstance, type ViewStyle } from 'react-native';
 
 import { PulseColors as C, PulseLayout, PulseRadius, PulseSpacing } from '@/constants/pulse-theme';
 import { PulseIcon, type PulseIconName } from './icon';
@@ -27,7 +27,7 @@ export function Button({ label, onPress, href, variant = 'secondary', compact = 
   expanded?: boolean;
   icon?: PulseIconName;
   accessibilityLabel?: string;
-  buttonRef?: Ref<View>;
+  buttonRef?: Ref<ViewInstance>;
 }) {
   const face = faces[selected ? 'primary' : variant];
   const inactive = disabled || loading;

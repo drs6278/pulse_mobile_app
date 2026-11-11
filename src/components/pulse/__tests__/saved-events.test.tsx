@@ -23,38 +23,38 @@ jest.mock('../ui', () => {
 const row: SavedEvent = { event_id: '9007199254740993', created_at: '2026-11-02', event: { id: '9007199254740993', title: 'Concert', category: 'Music', event_date: '2026-11-03', location: 'Hall' } };
 beforeEach(() => { jest.clearAllMocks(); mockData = []; mockLoading = false; mockSetSaved.mockResolvedValue(undefined); });
 test('bookmark saves the exact string ID without an RSVP', async () => {
-  const screen = render(<SaveEventButton id={row.event_id} title="Concert" />);
-  fireEvent.press(screen.getByLabelText('Save Concert'));
+  const screen = await render(<SaveEventButton id={row.event_id} title="Concert" />);
+  await fireEvent.press(screen.getByLabelText('Save Concert'));
   await waitFor(() => expect(mockSetSaved).toHaveBeenCalledWith(row.event_id, true));
 });
 test('saved bookmark removes the event and reports write failures', async () => {
   mockData = [row];
   mockSetSaved.mockRejectedValue(new Error('Connection failed. Try again.'));
-  const screen = render(<SaveEventButton id={row.event_id} title="Concert" />);
-  fireEvent.press(screen.getByLabelText('Unsave Concert'));
+  const screen = await render(<SaveEventButton id={row.event_id} title="Concert" />);
+  await fireEvent.press(screen.getByLabelText('Unsave Concert'));
   await waitFor(() => expect(screen.getByText('Connection failed. Try again.')).toBeTruthy());
   expect(mockSetSaved).toHaveBeenCalledWith(row.event_id, false);
   expect(screen.getByText('Saved')).toBeTruthy();
 });
-test('save is disabled until the account bookmarks have loaded', () => {
+test('save is disabled until the account bookmarks have loaded', async () => {
   mockLoading = true;
-  const screen = render(<SaveEventButton id={row.event_id} title="Concert" />);
-  fireEvent.press(screen.getByLabelText('Save Concert'));
+  const screen = await render(<SaveEventButton id={row.event_id} title="Concert" />);
+  await fireEvent.press(screen.getByLabelText('Save Concert'));
   expect(mockSetSaved).not.toHaveBeenCalled();
 });
-test('saved list shows real event details and a link using its ID', () => {
+test('saved list shows real event details and a link using its ID', async () => {
   mockData = [row];
-  const screen = render(<SavedEventsScreen />);
+  const screen = await render(<SavedEventsScreen />);
   expect(screen.getByText('Concert')).toBeTruthy();
   expect(screen.getByText('Hall')).toBeTruthy();
   expect(screen.getByLabelText(JSON.stringify({ pathname: '/event', params: { id: row.event_id } }))).toBeTruthy();
 });
 test('unavailable bookmarks remain removable', async () => {
   mockData = [{ ...row, event: null }];
-  const screen = render(<SavedEventsScreen />);
-  fireEvent.press(screen.getByText('Remove unavailable event'));
+  const screen = await render(<SavedEventsScreen />);
+  await fireEvent.press(screen.getByText('Remove unavailable event'));
   await waitFor(() => expect(mockSetSaved).toHaveBeenCalledWith(row.event_id, false));
 });
-test('empty list explains how to save events', () => {
-  expect(render(<SavedEventsScreen />).getByText('No saved events yet.')).toBeTruthy();
+test('empty list explains how to save events', async () => {
+  expect((await render(<SavedEventsScreen />)).getByText('No saved events yet.')).toBeTruthy();
 });

@@ -72,7 +72,7 @@ export default function CalendarScreen() {
         <View style={{ width: 80, gap: 4 }}><PulseText size={14}>{item.allDay ? 'All day' : DateTime.fromMillis(item.start, { zone }).toLocaleString(DateTime.TIME_SIMPLE)}</PulseText>{!item.allDay && <Message text={DateTime.fromMillis(item.end, { zone }).toFormat(item.end > selectedRange.end ? 'ccc h:mm a' : 'h:mm a')} />}</View>
         <View style={{ flex: 1, gap: 6 }}><PulseText size={20}>{item.title}</PulseText><Message text={item.location} /><Message text={item.kind} /></View>
       </PreviewLink>}
-      ListEmptyComponent={!calendar.loading && !calendar.error ? <Message text="No entries on this day. Add a class, commitment, or RSVP to a Pulse event." /> : null}
+      ListEmptyComponent={!calendar.loading && !calendar.error ? <Message text="No entries on this day. Add a class, commitment, or RSVP to a Pulse event." /> : undefined}
       ListFooterComponent={<View style={{ gap: 14, paddingTop: 16 }}>
         {calendar.unknown.map(item => <View key={String(item.event_id)} style={{ gap: 8 }}><PreviewLink href={{ pathname: '/event', params: { id: String(item.event_id) } }} label="Open RSVP with unknown time"><PulseText>{item.event?.title ?? 'Unavailable RSVP'}</PulseText></PreviewLink><Message text="Time unavailable. Review this RSVP before relying on free-time suggestions." /><Button label={`Cancel RSVP: ${item.event?.title ?? 'unavailable event'}`} disabled={canceling} onPress={() => void cancelUnavailable(String(item.event_id))} /></View>)}
         <Message text={rsvpError} error />

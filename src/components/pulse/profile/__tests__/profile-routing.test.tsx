@@ -31,7 +31,7 @@ jest.mock('../controls', () => ({ profileStyles: {} }));
 jest.mock('../../ui', () => ({ Screen: () => null, TitleHeader: () => null }));
 
 test('real router keeps deep links gated, permits deletion, and opens home after setup', async () => {
-  const route = renderRouter({
+  const route = await renderRouter({
     _layout: () => <Stack />,
     '(app)/_layout': () => <AccountBoundary><Stack /></AccountBoundary>,
     '(app)/index': () => <Text>Home after setup</Text>,
@@ -41,10 +41,10 @@ test('real router keeps deep links gated, permits deletion, and opens home after
   expect(route.getByText('Required setup')).toBeTruthy();
   expect(route.queryByText('Private calendar')).toBeNull();
   const { fireEvent } = jest.requireActual<typeof import('@testing-library/react-native')>('@testing-library/react-native');
-  fireEvent.press(route.getByText('Delete account from setup'));
+  await fireEvent.press(route.getByText('Delete account from setup'));
   await waitFor(() => expect(route.getPathname()).toBe('/delete-account'));
   expect(route.getByText('Delete account without setup')).toBeTruthy();
-  act(() => mockSetProfile({ ...mockInitial, private: { ...mockInitial.private, profile_setup_completed_at: '2026-10-23' } }));
+  await act(() => mockSetProfile({ ...mockInitial, private: { ...mockInitial.private, profile_setup_completed_at: '2026-10-23' } }));
   await waitFor(() => expect(route.getPathname()).toBe('/'));
   expect(route.getByText('Home after setup')).toBeTruthy();
 });

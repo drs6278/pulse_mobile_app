@@ -1,5 +1,5 @@
 import { useState, type Ref } from 'react';
-import { TextInput, View, type TextInputProps } from 'react-native';
+import { TextInput, View, type TextInputInstance, type TextInputProps } from 'react-native';
 
 import { PulseColors as C, PulseLayout, PulseRadius, PulseSpacing, PulseType } from '@/constants/pulse-theme';
 import { InlineMessage } from './feedback';
@@ -9,7 +9,7 @@ export function TextField({ label, hideLabel = false, error, inputRef, onFocus, 
   label: string;
   hideLabel?: boolean;
   error?: string | null;
-  inputRef?: Ref<TextInput>;
+  inputRef?: Ref<TextInputInstance>;
 }) {
   const [focused, setFocused] = useState(false);
   const borderColor = error ? C.danger : focused ? C.accent : C.border;

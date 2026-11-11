@@ -31,50 +31,50 @@ jest.mock('../schedule/controls', () => {
   return { Button: ({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) => <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress}><Text>{label}</Text></Pressable>, Message: ({ text }: { text?: string }) => text ? <Text>{text}</Text> : null };
 });
 beforeEach(() => { jest.clearAllMocks(); mockUser = 'alice'; mockLoading = false; mockUpdate.mockResolvedValue(undefined); });
-test('only the original poster gets the edit form', () => {
+test('only the original poster gets the edit form', async () => {
   mockUser = 'bob';
-  const screen = render(<EditEventScreen />);
+  const screen = await render(<EditEventScreen />);
   expect(screen.queryByLabelText('Title')).toBeNull();
   expect(screen.getByText(/unavailable for editing/)).toBeTruthy();
 });
 test('saving publishes all draft values and refreshes event and RSVP views', async () => {
-  const screen = render(<EditEventScreen />);
+  const screen = await render(<EditEventScreen />);
   expect(mockPrevent).toBe(false);
-  fireEvent.changeText(screen.getByLabelText('Title'), 'Updated');
+  await fireEvent.changeText(screen.getByLabelText('Title'), 'Updated');
   expect(mockPrevent).toBe(true);
-  fireEvent.press(screen.getByText('Save changes'));
+  await fireEvent.press(screen.getByText('Save changes'));
   await waitFor(() => expect(mockReplace).toHaveBeenCalledWith({ pathname: '/event', params: { id: '1' } }));
   expect(mockUpdate).toHaveBeenCalledWith({}, mockEvent, expect.objectContaining({ title: 'Updated', location: 'Gym' }));
   expect(mockRefresh).toHaveBeenCalledTimes(2);
   expect(mockPrevent).toBe(false);
 });
-test('leaving a dirty form asks before dispatching navigation', () => {
+test('leaving a dirty form asks before dispatching navigation', async () => {
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-  const screen = render(<EditEventScreen />);
-  fireEvent.changeText(screen.getByLabelText('Title'), 'Updated');
+  const screen = await render(<EditEventScreen />);
+  await fireEvent.changeText(screen.getByLabelText('Title'), 'Updated');
   const action = { type: 'GO_BACK' };
-  act(() => mockLeave({ data: { action } }));
+  await act(() => mockLeave({ data: { action } }));
   expect(mockDispatch).not.toHaveBeenCalled();
   const buttons = alert.mock.calls[0][2]!;
-  act(() => buttons.find(button => button.text === 'Discard')!.onPress!());
+  await act(() => buttons.find(button => button.text === 'Discard')!.onPress!());
   expect(mockDispatch).toHaveBeenCalledWith(action);
   alert.mockRestore();
 });
 test('a failed save preserves the draft and discard protection', async () => {
   mockUpdate.mockRejectedValue(new Error('This event changed. Reopen the editor.'));
-  const screen = render(<EditEventScreen />);
-  fireEvent.changeText(screen.getByLabelText('Title'), 'Updated');
-  fireEvent.press(screen.getByText('Save changes'));
+  const screen = await render(<EditEventScreen />);
+  await fireEvent.changeText(screen.getByLabelText('Title'), 'Updated');
+  await fireEvent.press(screen.getByText('Save changes'));
   await waitFor(() => expect(screen.getByText(/This event changed/)).toBeTruthy());
   expect(screen.getByLabelText('Title').props.value).toBe('Updated');
   expect(mockPrevent).toBe(true);
   expect(mockReplace).not.toHaveBeenCalled();
 });
-test('a foreground reload preserves a dirty editor and its discard protection', () => {
-  const screen = render(<EditEventScreen />);
-  fireEvent.changeText(screen.getByLabelText('Title'), 'Unsaved draft');
+test('a foreground reload preserves a dirty editor and its discard protection', async () => {
+  const screen = await render(<EditEventScreen />);
+  await fireEvent.changeText(screen.getByLabelText('Title'), 'Unsaved draft');
   mockLoading = true;
-  screen.rerender(<EditEventScreen />);
+  await screen.rerender(<EditEventScreen />);
   expect(screen.getByLabelText('Title').props.value).toBe('Unsaved draft');
   expect(mockPrevent).toBe(true);
 });

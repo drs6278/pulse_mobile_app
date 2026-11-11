@@ -55,16 +55,16 @@ beforeEach(() => {
 });
 
 test('setup starts blank and requires an explicit age choice, including prefer not to say', async () => {
-  const screen = render(<ProfileForm initial={unfinished} setup />);
+  const screen = await render(<ProfileForm initial={unfinished} setup />);
   expect(screen.getByLabelText('Display name').props.value).toBe('');
-  fireEvent.press(screen.getByLabelText('Finish setup'));
+  await fireEvent.press(screen.getByLabelText('Finish setup'));
   expect(mockSave).not.toHaveBeenCalled();
   expect(screen.getByText('Choose an age eligibility option.')).toBeTruthy();
-  fireEvent.changeText(screen.getByLabelText('Display name'), 'New Alice');
-  fireEvent.press(screen.getByLabelText('Finish setup'));
+  await fireEvent.changeText(screen.getByLabelText('Display name'), 'New Alice');
+  await fireEvent.press(screen.getByLabelText('Finish setup'));
   expect(mockSave).not.toHaveBeenCalled();
-  fireEvent.press(screen.getByLabelText('Prefer not to say'));
-  fireEvent.press(screen.getByLabelText('Finish setup'));
+  await fireEvent.press(screen.getByLabelText('Prefer not to say'));
+  await fireEvent.press(screen.getByLabelText('Finish setup'));
   await waitFor(() => expect(mockSave).toHaveBeenCalledWith(expect.anything(), { display_name: 'New Alice', bio: '', age_band: 'unknown' }, 1, undefined));
   expect(mockMutate).toHaveBeenCalledWith(expect.any(Function), { completeSetup: true });
   expect(mockPreventRemove).not.toHaveBeenCalled();
@@ -75,109 +75,109 @@ test('setup keeps drafts on write failure and retries only verification after a 
   mockSave.mockRejectedValueOnce(new Error('Save offline'));
   mockMutate.mockImplementationOnce(async fn => fn('alice'))
     .mockImplementationOnce(async fn => { await fn('alice'); throw new Error('Read offline'); });
-  const screen = render(<ProfileForm initial={unfinished} setup />);
-  fireEvent.changeText(screen.getByLabelText('Display name'), 'New Alice');
-  fireEvent.press(screen.getByLabelText('18–20'));
-  fireEvent.press(screen.getByLabelText('Finish setup'));
+  const screen = await render(<ProfileForm initial={unfinished} setup />);
+  await fireEvent.changeText(screen.getByLabelText('Display name'), 'New Alice');
+  await fireEvent.press(screen.getByLabelText('18–20'));
+  await fireEvent.press(screen.getByLabelText('Finish setup'));
   await waitFor(() => expect(screen.getByText('Save offline')).toBeTruthy());
   expect(screen.getByLabelText('Display name').props.value).toBe('New Alice');
-  fireEvent.press(screen.getByLabelText('Finish setup'));
+  await fireEvent.press(screen.getByLabelText('Finish setup'));
   await waitFor(() => expect(screen.getByText('Read offline')).toBeTruthy());
   expect(screen.getByLabelText('Display name').props.editable).toBe(false);
-  fireEvent.press(screen.getByLabelText('Retry profile check'));
+  await fireEvent.press(screen.getByLabelText('Retry profile check'));
   await waitFor(() => expect(mockMutate).toHaveBeenCalledTimes(3));
   expect(mockSave).toHaveBeenCalledTimes(2);
 });
 
-test('incomplete accounts cannot mount app screens through deep links or back navigation', () => {
+test('incomplete accounts cannot mount app screens through deep links or back navigation', async () => {
   mockResource.data = unfinished;
   const child = <ProfileEditor initial={initial} />;
-  const screen = render(<AccountBoundary>{child}</AccountBoundary>);
+  const screen = await render(<AccountBoundary>{child}</AccountBoundary>);
   expect(screen.getByText(/Choose a display name/)).toBeTruthy();
   expect(screen.queryByLabelText('Save profile')).toBeNull();
   expect(screen.getByLabelText('Sign out')).toBeTruthy();
   mockPathname = '/calendar';
-  screen.rerender(<AccountBoundary>{child}</AccountBoundary>);
+  await screen.rerender(<AccountBoundary>{child}</AccountBoundary>);
   expect(screen.getByLabelText('Finish setup')).toBeTruthy();
   mockResource.data = initial;
-  screen.rerender(<AccountBoundary>{child}</AccountBoundary>);
+  await screen.rerender(<AccountBoundary>{child}</AccountBoundary>);
   expect(screen.getByLabelText('Save profile')).toBeTruthy();
   expect(mockReplace).toHaveBeenCalledWith('/');
 });
 
 test('incomplete accounts can delete their account and sign out without completing setup', async () => {
   mockResource.data = unfinished;
-  const screen = render(<AccountBoundary>App content</AccountBoundary>);
-  fireEvent.press(screen.getByLabelText('Sign out'));
+  const screen = await render(<AccountBoundary>App content</AccountBoundary>);
+  await fireEvent.press(screen.getByLabelText('Sign out'));
   await waitFor(() => expect(mockSignOut).toHaveBeenCalledTimes(1));
   mockPathname = '/delete-account';
-  screen.rerender(<AccountBoundary>App content</AccountBoundary>);
+  await screen.rerender(<AccountBoundary>App content</AccountBoundary>);
   expect(screen.getByText('Permanently leave Pulse?')).toBeTruthy();
   expect(screen.queryByLabelText('Finish setup')).toBeNull();
 });
 
-test('profile loading failures, suspension, and deletion cannot expose app screens', () => {
+test('profile loading failures, suspension, and deletion cannot expose app screens', async () => {
   mockResource.data = null; mockResource.loading = true;
-  const screen = render(<AccountBoundary>Private app content</AccountBoundary>);
+  const screen = await render(<AccountBoundary>Private app content</AccountBoundary>);
   expect(screen.queryByText('Private app content')).toBeNull();
   mockResource.loading = false; mockResource.error = 'Offline';
-  screen.rerender(<AccountBoundary>Private app content</AccountBoundary>);
+  await screen.rerender(<AccountBoundary>Private app content</AccountBoundary>);
   expect(screen.getByText('Offline')).toBeTruthy();
   for (const state of ['suspended', 'deleting'] as const) {
     mockResource.error = null;
     mockResource.data = { ...unfinished, private: { ...unfinished.private, account_state: state } };
-    screen.rerender(<AccountBoundary>Private app content</AccountBoundary>);
+    await screen.rerender(<AccountBoundary>Private app content</AccountBoundary>);
     expect(screen.queryByText('Private app content')).toBeNull();
     expect(screen.queryByLabelText('Finish setup')).toBeNull();
   }
 });
-test('private hub shows private email and age without putting them in the public profile link', () => {
-  const screen = render(<MyProfileScreen />);
+test('private hub shows private email and age without putting them in the public profile link', async () => {
+  const screen = await render(<MyProfileScreen />);
   expect(screen.getByText('private@example.invalid')).toBeTruthy();
   expect(screen.getByText(/Age eligibility: 21 or older/)).toBeTruthy();
   expect(screen.getByText('View student profile')).toBeTruthy();
 });
 test('invalid name is not saved and successful edits preserve the baseline version', async () => {
-  const screen = render(<ProfileEditor initial={initial} />);
-  fireEvent.changeText(screen.getByLabelText('Display name'), '   ');
-  fireEvent.press(screen.getByLabelText('Save profile'));
+  const screen = await render(<ProfileEditor initial={initial} />);
+  await fireEvent.changeText(screen.getByLabelText('Display name'), '   ');
+  await fireEvent.press(screen.getByLabelText('Save profile'));
   expect(mockSave).not.toHaveBeenCalled();
   expect(screen.getByText(/Use 1–60/)).toBeTruthy();
-  fireEvent.changeText(screen.getByLabelText('Display name'), 'Updated Alice');
+  await fireEvent.changeText(screen.getByLabelText('Display name'), 'Updated Alice');
   // A foreground refresh must not silently overwrite a concurrent server version.
-  screen.rerender(<ProfileEditor initial={{ ...initial, public: { ...initial.public!, version: 8 } }} />);
-  fireEvent.press(screen.getByLabelText('Save profile'));
+  await screen.rerender(<ProfileEditor initial={{ ...initial, public: { ...initial.public!, version: 8 } }} />);
+  await fireEvent.press(screen.getByLabelText('Save profile'));
   await waitFor(() => expect(mockSave).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ display_name: 'Updated Alice' }), 7, undefined));
   await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/profile'));
 });
 test('save failures retain the draft and show an actionable error', async () => {
   mockSave.mockRejectedValueOnce(new Error('Profile changed. Reload before saving.'));
-  const screen = render(<ProfileEditor initial={initial} />);
-  fireEvent.changeText(screen.getByLabelText('Bio (optional)'), 'My unsaved bio');
-  fireEvent.press(screen.getByLabelText('Save profile'));
+  const screen = await render(<ProfileEditor initial={initial} />);
+  await fireEvent.changeText(screen.getByLabelText('Bio (optional)'), 'My unsaved bio');
+  await fireEvent.press(screen.getByLabelText('Save profile'));
   await waitFor(() => expect(screen.getByText(/Profile changed/)).toBeTruthy());
   expect(screen.getByLabelText('Bio (optional)').props.value).toBe('My unsaved bio');
   expect(mockReplace).not.toHaveBeenCalled();
-  fireEvent.press(screen.getByLabelText('Discard changes and reload'));
+  await fireEvent.press(screen.getByLabelText('Discard changes and reload'));
   await waitFor(() => expect(screen.getByLabelText('Display name').props.value).toBe('Latest Alice'));
-  fireEvent.changeText(screen.getByLabelText('Bio (optional)'), 'Updated against latest');
-  fireEvent.press(screen.getByLabelText('Save profile'));
+  await fireEvent.changeText(screen.getByLabelText('Bio (optional)'), 'Updated against latest');
+  await fireEvent.press(screen.getByLabelText('Save profile'));
   await waitFor(() => expect(mockSave).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ bio: 'Updated against latest' }), 8, undefined));
 });
 
 test('PNG upload failure keeps bio and allows an explicit text save preserving the current photo', async () => {
   mockPickAvatar.mockResolvedValueOnce({ bytes: new Uint8Array([137, 80, 78, 71]), mime: 'image/png', uri: 'blob:photo', dispose: jest.fn() });
   mockInvoke.mockRejectedValueOnce(new Error('Photo uploads are unavailable right now.'));
-  const screen = render(<ProfileEditor initial={{ ...initial, public: { ...initial.public!, avatar_path: 'alice/old.jpg' } }} />);
-  fireEvent.press(screen.getByLabelText('Choose profile photo'));
+  const screen = await render(<ProfileEditor initial={{ ...initial, public: { ...initial.public!, avatar_path: 'alice/old.jpg' } }} />);
+  await fireEvent.press(screen.getByLabelText('Choose profile photo'));
   await waitFor(() => expect(screen.getByLabelText('Bio (optional)').props.editable).toBe(true));
-  fireEvent.changeText(screen.getByLabelText('Bio (optional)'), 'My new bio');
-  fireEvent.press(screen.getByLabelText('Save profile'));
+  await fireEvent.changeText(screen.getByLabelText('Bio (optional)'), 'My new bio');
+  await fireEvent.press(screen.getByLabelText('Save profile'));
   await waitFor(() => expect(screen.getByLabelText('Save without new photo')).toBeTruthy());
   expect(mockInvoke).toHaveBeenCalledWith(expect.anything(), 'profile-avatar', expect.any(ArrayBuffer), 'image/png');
   expect(mockSave).not.toHaveBeenCalled();
   expect(screen.getByLabelText('Bio (optional)').props.value).toBe('My new bio');
-  fireEvent.press(screen.getByLabelText('Save without new photo'));
+  await fireEvent.press(screen.getByLabelText('Save without new photo'));
   await waitFor(() => expect(mockSave).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ bio: 'My new bio' }), 7, undefined));
   expect(mockInvoke).toHaveBeenCalledTimes(1);
   await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/profile'));
@@ -186,37 +186,37 @@ test('PNG upload failure keeps bio and allows an explicit text save preserving t
 test('PNG and bio save together after a successful photo upload', async () => {
   mockPickAvatar.mockResolvedValueOnce({ bytes: new Uint8Array([137, 80, 78, 71]), mime: 'image/png', uri: 'blob:photo', dispose: jest.fn() });
   mockInvoke.mockResolvedValueOnce({ path: 'alice/new.jpg' });
-  const screen = render(<ProfileEditor initial={initial} />);
-  fireEvent.press(screen.getByLabelText('Choose profile photo'));
+  const screen = await render(<ProfileEditor initial={initial} />);
+  await fireEvent.press(screen.getByLabelText('Choose profile photo'));
   await waitFor(() => expect(screen.getByLabelText('Bio (optional)').props.editable).toBe(true));
-  fireEvent.changeText(screen.getByLabelText('Bio (optional)'), 'With a PNG');
-  fireEvent.press(screen.getByLabelText('Save profile'));
+  await fireEvent.changeText(screen.getByLabelText('Bio (optional)'), 'With a PNG');
+  await fireEvent.press(screen.getByLabelText('Save profile'));
   await waitFor(() => expect(mockSave).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ bio: 'With a PNG' }), 7, 'alice/new.jpg'));
 });
 test('password changes handle secure-change verification codes and clear passwords on success', async () => {
   mockUpdatePassword.mockResolvedValueOnce({ error: { code: 'reauthentication_needed', message: 'Verify your identity.' } });
-  const screen = render(<ChangePasswordScreen />);
-  fireEvent.changeText(screen.getByLabelText('Current password'), 'original password');
-  fireEvent.changeText(screen.getByLabelText('New password'), 'long unique password');
-  fireEvent.changeText(screen.getByLabelText('Confirm new password'), 'long unique password');
-  fireEvent.press(screen.getByLabelText('Save new password'));
+  const screen = await render(<ChangePasswordScreen />);
+  await fireEvent.changeText(screen.getByLabelText('Current password'), 'original password');
+  await fireEvent.changeText(screen.getByLabelText('New password'), 'long unique password');
+  await fireEvent.changeText(screen.getByLabelText('Confirm new password'), 'long unique password');
+  await fireEvent.press(screen.getByLabelText('Save new password'));
   await waitFor(() => expect(screen.getByLabelText('Send verification code')).toBeTruthy());
-  fireEvent.press(screen.getByLabelText('Send verification code'));
+  await fireEvent.press(screen.getByLabelText('Send verification code'));
   await waitFor(() => expect(mockReauth).toHaveBeenCalled());
-  fireEvent.changeText(screen.getByLabelText('Email verification code'), '123456');
-  fireEvent.press(screen.getByLabelText('Save new password'));
+  await fireEvent.changeText(screen.getByLabelText('Email verification code'), '123456');
+  await fireEvent.press(screen.getByLabelText('Save new password'));
   await waitFor(() => expect(screen.getByText('Password changed')).toBeTruthy());
   expect(mockUpdatePassword).toHaveBeenLastCalledWith({ password: 'long unique password', current_password: 'original password', nonce: '123456' });
   expect(screen.queryByLabelText('New password')).toBeNull();
 });
 test('deletion requires explicit confirmation and current password before invoking the server', async () => {
-  const screen = render(<DeleteAccountScreen />);
-  fireEvent.press(screen.getByLabelText('Continue to account deletion'));
+  const screen = await render(<DeleteAccountScreen />);
+  await fireEvent.press(screen.getByLabelText('Continue to account deletion'));
   expect(mockInvoke).not.toHaveBeenCalled();
-  fireEvent.press(screen.getByLabelText('Permanently delete my account'));
+  await fireEvent.press(screen.getByLabelText('Permanently delete my account'));
   expect(mockInvoke).not.toHaveBeenCalled();
-  fireEvent.changeText(screen.getByLabelText('Current password'), 'current password');
-  fireEvent.press(screen.getByLabelText('Permanently delete my account'));
+  await fireEvent.changeText(screen.getByLabelText('Current password'), 'current password');
+  await fireEvent.press(screen.getByLabelText('Permanently delete my account'));
   await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith(expect.anything(), 'profile-account', { password: 'current password' }));
   await waitFor(() => expect(mockSignOut).toHaveBeenCalled());
 });

@@ -9,32 +9,32 @@ describe('user resource isolation', () => {
   test('ignores late responses after an account switch', async () => {
     let finishAlice!: (value: string) => void;
     const loader = jest.fn((user: string) => user === 'alice' ? new Promise<string>(resolve => { finishAlice = resolve; }) : Promise.resolve('Bob private data'));
-    const { result, rerender } = renderHook(() => useUserResource(loader));
+    const { result, rerender } = await renderHook(() => useUserResource(loader));
     expect(result.current.loading).toBe(true);
-    mockUser = 'bob'; rerender({});
+    mockUser = 'bob'; await rerender({});
     await waitFor(() => expect(result.current.data).toBe('Bob private data'));
     await act(async () => finishAlice('Alice private data'));
     expect(result.current.data).toBe('Bob private data');
   });
   test('does not invalidate another session after a delayed mutation', async () => {
     const loader = jest.fn(async (user: string) => `${user} data`);
-    const { result, rerender } = renderHook(() => useUserResource(loader));
+    const { result, rerender } = await renderHook(() => useUserResource(loader));
     await waitFor(() => expect(result.current.data).toBe('alice data'));
     let finish!: () => void;
     const operation = new Promise<void>(resolve => { finish = resolve; });
     let pending!: Promise<unknown>;
-    act(() => { pending = result.current.mutate(() => operation); });
+    await act(() => { pending = result.current.mutate(() => operation); });
     const assertion = expect(pending).rejects.toThrow('Account changed');
-    mockUser = 'bob'; rerender({});
+    mockUser = 'bob'; await rerender({});
     await waitFor(() => expect(result.current.data).toBe('bob data'));
     await act(async () => finish()); await assertion;
     expect(loader).toHaveBeenCalledTimes(2);
   });
   test('a refresh failure cannot leave availability backed by old data', async () => {
     const loader = jest.fn<() => Promise<string>>().mockResolvedValueOnce('complete').mockRejectedValueOnce(new Error('Offline'));
-    const { result } = renderHook(() => useUserResource(loader));
+    const { result } = await renderHook(() => useUserResource(loader));
     await waitFor(() => expect(result.current.data).toBe('complete'));
-    act(() => result.current.refresh());
+    await act(() => result.current.refresh());
     await waitFor(() => expect(result.current.error).toBe('Offline'));
     expect(result.current.data).toBeNull();
   });

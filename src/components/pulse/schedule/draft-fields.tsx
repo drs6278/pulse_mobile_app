@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { useEffect, useRef, useState } from 'react';
-import { TextInput, View } from 'react-native';
+import { View, type TextInputInstance, type ViewInstance } from 'react-native';
 import type { ScheduleDraft } from '@/lib/schedule/types';
 import { inclusiveEnd, moveScheduleStart, setInclusiveEnd } from '@/lib/schedule/editor';
 import { setAllDay } from '@/lib/schedule/import/review';
@@ -10,7 +10,7 @@ import { Button, Disclosure, Field, Message } from './controls';
 
 export function DraftFields({ draft, onChange, disabled = false, occurrence = false, errors = [], onBlur, focusError }: { draft: ScheduleDraft; onChange: (patch: Partial<ScheduleDraft>) => void; disabled?: boolean; occurrence?: boolean; errors?: string[]; onBlur?: () => void; focusError?: { error: string; id: number } }) {
   const [more, setMore] = useState(false);
-  const titleRef = useRef<TextInput>(null), locationRef = useRef<TextInput>(null), zoneRef = useRef<TextInput>(null), intervalRef = useRef<TextInput>(null), weekdayRef = useRef<View>(null);
+  const titleRef = useRef<TextInputInstance>(null), locationRef = useRef<TextInputInstance>(null), zoneRef = useRef<TextInputInstance>(null), intervalRef = useRef<TextInputInstance>(null), weekdayRef = useRef<ViewInstance>(null);
   useEffect(() => {
     if (!focusError) return;
     const error = focusError.error;

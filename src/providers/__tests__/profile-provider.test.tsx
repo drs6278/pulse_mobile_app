@@ -18,11 +18,11 @@ function profile(user = 'alice', complete = false): OwnProfile {
 beforeEach(() => { mockUser = 'alice'; mockLoad.mockReset().mockResolvedValue(profile()); });
 
 test('restored sessions retain incomplete status until an authoritative post-save read succeeds', async () => {
-  const { result } = renderHook(() => useProfile(), { wrapper: ProfileProvider });
+  const { result } = await renderHook(() => useProfile(), { wrapper: ProfileProvider });
   await waitFor(() => expect(result.current.data).toEqual(profile()));
   let finish!: (value: OwnProfile) => void;
   mockLoad.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-  const operation = jest.fn<() => Promise<void>>().mockResolvedValue();
+  const operation = jest.fn<(user: string) => Promise<void>>().mockResolvedValue();
   let pending!: Promise<void>;
   await act(async () => { pending = result.current.mutate(operation, { completeSetup: true }); });
   expect(result.current.data?.private.profile_setup_completed_at).toBeNull();
@@ -32,11 +32,11 @@ test('restored sessions retain incomplete status until an authoritative post-sav
 });
 
 test('older foreground responses cannot undo confirmed completion', async () => {
-  const { result } = renderHook(() => useProfile(), { wrapper: ProfileProvider });
+  const { result } = await renderHook(() => useProfile(), { wrapper: ProfileProvider });
   await waitFor(() => expect(result.current.data).toEqual(profile()));
   let finishOldRead!: (value: OwnProfile) => void;
   mockLoad.mockImplementationOnce(() => new Promise(resolve => { finishOldRead = resolve; }));
-  act(() => result.current.refresh());
+  await act(() => result.current.refresh());
   await waitFor(() => expect(mockLoad).toHaveBeenCalledTimes(2));
   mockLoad.mockResolvedValueOnce(profile('alice', true));
   await act(async () => { await result.current.mutate(async () => {}, { completeSetup: true }); });
@@ -45,7 +45,7 @@ test('older foreground responses cannot undo confirmed completion', async () => 
 });
 
 test('offline or incomplete post-save reads keep setup locked and support retry', async () => {
-  const { result } = renderHook(() => useProfile(), { wrapper: ProfileProvider });
+  const { result } = await renderHook(() => useProfile(), { wrapper: ProfileProvider });
   await waitFor(() => expect(result.current.data).toEqual(profile()));
   mockLoad.mockRejectedValueOnce(new Error('Offline'));
   await act(async () => {
@@ -61,7 +61,7 @@ test('offline or incomplete post-save reads keep setup locked and support retry'
 });
 
 test('a delayed setup confirmation never unlocks another account', async () => {
-  const { result, rerender } = renderHook(() => useProfile(), { wrapper: ProfileProvider });
+  const { result, rerender } = await renderHook(() => useProfile(), { wrapper: ProfileProvider });
   await waitFor(() => expect(result.current.data).toEqual(profile()));
   let finish!: (value: OwnProfile) => void;
   mockLoad.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
@@ -69,7 +69,7 @@ test('a delayed setup confirmation never unlocks another account', async () => {
   await act(async () => { pending = result.current.mutate(async () => {}, { completeSetup: true }); });
   const assertion = expect(pending).rejects.toThrow('Account changed');
   mockLoad.mockResolvedValueOnce(profile('bob'));
-  mockUser = 'bob'; rerender({});
+  mockUser = 'bob'; await rerender({});
   await waitFor(() => expect(result.current.data?.private.user_id).toBe('bob'));
   await act(async () => { finish(profile('alice', true)); await assertion; });
   expect(result.current.data).toEqual(profile('bob'));

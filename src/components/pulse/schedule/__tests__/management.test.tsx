@@ -29,9 +29,9 @@ beforeEach(()=>{mockParams={id:'one'};mockSchedule.loading=false;mockSave.mockRe
 
 test('a one-off opens its full editor even when an old calendar link supplies occurrence',async()=>{
   mockParams.occurrence=initial.start_local;
-  const screen=render(<EntryScreen/>);
-  fireEvent.changeText(screen.getByLabelText('Title'),'Edited CS');
-  fireEvent.press(screen.getByLabelText('Save entry'));
+  const screen=await render(<EntryScreen/>);
+  await fireEvent.changeText(screen.getByLabelText('Title'),'Edited CS');
+  await fireEvent.press(screen.getByLabelText('Save entry'));
   await waitFor(()=>expect(mockReplace).toHaveBeenCalledWith('/calendar'));
   expect(mockSave).toHaveBeenCalled();expect(mockException).not.toHaveBeenCalled();
   const args=mockSave.mock.calls[0] as unknown[];
@@ -41,85 +41,85 @@ test('a one-off opens its full editor even when an old calendar link supplies oc
 test('editing an occurrence retains its original identity',async()=>{
   mockParams.occurrence=initial.start_local;
   mockSchedule.data.series=[{...initial,term_end:'2026-12-01',recurrence:{days:[1],interval:1,weekStart:1,count:null,until:null}}];
-  const screen=render(<EntryScreen/>);
+  const screen=await render(<EntryScreen/>);
   expect(screen.queryByLabelText('Title')).toBeNull();
-  fireEvent.changeText(screen.getByLabelText('Start time'),'09:15');
-  fireEvent.press(screen.getByLabelText('Save entry'));
+  await fireEvent.changeText(screen.getByLabelText('Start time'),'09:15');
+  await fireEvent.press(screen.getByLabelText('Save entry'));
   await waitFor(()=>expect(mockException).toHaveBeenCalled());
   expect((mockException.mock.calls[0] as unknown[]).slice(2)).toEqual([initial.start_local,false,'2026-10-26T09:15:00','2026-10-26T10:15:00']);
   expect(mockSave).not.toHaveBeenCalled();
 });
 
-test('whole-series save requires explicit consent to remove occurrence changes',()=>{
+test('whole-series save requires explicit consent to remove occurrence changes',async ()=>{
   mockSchedule.data.series=[{...initial,term_end:'2026-12-01',recurrence:{days:[1],interval:1,weekStart:1,count:null,until:null}}];
   mockSchedule.data.exceptions=[{user_id:'alice',series_id:'one',recurrence_key:initial.start_local,cancelled:true,start_local:null,end_local:null}];
-  const screen=render(<EntryScreen/>);
+  const screen=await render(<EntryScreen/>);
   expect(screen.getByLabelText('Save entry')).toBeDisabled();
-  fireEvent.press(screen.getByLabelText('Allow removal of occurrence changes'));
+  await fireEvent.press(screen.getByLabelText('Allow removal of occurrence changes'));
   expect(screen.getByLabelText('Save entry')).toBeEnabled();
 });
 
 test('management finds entries outside the visible week and clear requires confirmation',async()=>{
-  const screen=render(<SettingsScreen/>);
+  const screen=await render(<SettingsScreen/>);
   expect(screen.getByLabelText('Edit schedule: CS')).toBeTruthy();
-  fireEvent.changeText(screen.getByLabelText('Find a class or commitment'),'Missing');
+  await fireEvent.changeText(screen.getByLabelText('Find a class or commitment'),'Missing');
   expect(screen.getByText('No matching entries.')).toBeTruthy();
-  fireEvent.press(screen.getByLabelText('Destructive actions'));
-  fireEvent.press(screen.getByLabelText('Clear entire schedule'));
+  await fireEvent.press(screen.getByLabelText('Destructive actions'));
+  await fireEvent.press(screen.getByLabelText('Clear entire schedule'));
   expect(mockClear).not.toHaveBeenCalled();
-  fireEvent.press(screen.getByLabelText('Keep entire schedule'));
+  await fireEvent.press(screen.getByLabelText('Keep entire schedule'));
   expect(mockClear).not.toHaveBeenCalled();
-  fireEvent.press(screen.getByLabelText('Clear entire schedule'));
-  fireEvent.press(screen.getByLabelText('Confirm clear entire schedule'));
+  await fireEvent.press(screen.getByLabelText('Clear entire schedule'));
+  await fireEvent.press(screen.getByLabelText('Confirm clear entire schedule'));
   await waitFor(()=>expect(mockClear).toHaveBeenCalledTimes(1));
 });
 
 test('a new entry uses the selected day and keeps advanced fields out of the primary form', async () => {
   mockParams = { date: '2027-01-04' };
-  const screen = render(<EntryScreen />);
+  const screen = await render(<EntryScreen />);
   expect(screen.getByLabelText('Start date').props.value).toBe('2027-01-04');
   expect(screen.getByLabelText('Start time').props.value).toBe('09:00');
   expect(screen.queryByLabelText('Timezone')).toBeNull();
   expect(screen.queryByText('Title must contain 1–200 characters.')).toBeNull();
-  fireEvent.changeText(screen.getByLabelText('Title'), 'Study');
-  fireEvent.press(screen.getByLabelText('Save entry'));
+  await fireEvent.changeText(screen.getByLabelText('Title'), 'Study');
+  await fireEvent.press(screen.getByLabelText('Save entry'));
   await waitFor(() => expect(mockSave).toHaveBeenCalled());
   expect((mockSave.mock.calls[0] as unknown[])[1]).toMatchObject({ start_local: '2027-01-04T09:00:00', end_local: '2027-01-04T10:00:00', recurrence: null, kind: 'commitment' });
 });
 
 test('a failed save and background refresh retain the draft and original version', async () => {
   mockSave.mockRejectedValueOnce(new Error('Try again'));
-  const screen = render(<EntryScreen />);
-  fireEvent.changeText(screen.getByLabelText('Title'), 'Unsaved title');
-  fireEvent.press(screen.getByLabelText('Save entry'));
+  const screen = await render(<EntryScreen />);
+  await fireEvent.changeText(screen.getByLabelText('Title'), 'Unsaved title');
+  await fireEvent.press(screen.getByLabelText('Save entry'));
   await waitFor(() => expect(screen.getByText('Try again')).toBeTruthy());
   mockSchedule.loading = true;
-  screen.rerender(<EntryScreen />);
+  await screen.rerender(<EntryScreen />);
   expect(screen.getByLabelText('Title').props.value).toBe('Unsaved title');
   mockSchedule.loading = false;
   mockSchedule.data.series = [{ ...initial, version: 3, title: 'Other device' }];
-  screen.rerender(<EntryScreen />);
-  fireEvent.press(screen.getByLabelText('Save entry'));
+  await screen.rerender(<EntryScreen />);
+  await fireEvent.press(screen.getByLabelText('Save entry'));
   await waitFor(() => expect(mockSave).toHaveBeenCalledTimes(2));
   expect((mockSave.mock.calls[1] as unknown[])[2]).toMatchObject({ version: 2 });
 });
 
 test('all-day editing shows the last included day and saves an exclusive end', async () => {
-  const screen = render(<EntryScreen />);
-  fireEvent.press(screen.getByLabelText('All day'));
+  const screen = await render(<EntryScreen />);
+  await fireEvent.press(screen.getByLabelText('All day'));
   expect(screen.queryByLabelText('Start time')).toBeNull();
   expect(screen.getByLabelText('Last day date').props.value).toBe('2026-10-26');
-  fireEvent.changeText(screen.getByLabelText('Last day date'), '2026-10-28');
-  fireEvent.press(screen.getByLabelText('Save entry'));
+  await fireEvent.changeText(screen.getByLabelText('Last day date'), '2026-10-28');
+  await fireEvent.press(screen.getByLabelText('Save entry'));
   await waitFor(() => expect(mockSave).toHaveBeenCalled());
   expect((mockSave.mock.calls[0] as unknown[])[1]).toMatchObject({ all_day: true, end_local: '2026-10-29T00:00:00' });
 });
 
-test('invalid entries explain the problem on save without writing', () => {
+test('invalid entries explain the problem on save without writing', async () => {
   mockParams = { date: '2027-01-04' };
-  const screen = render(<EntryScreen />);
+  const screen = await render(<EntryScreen />);
   expect(screen.queryAllByRole('alert')).toHaveLength(0);
-  fireEvent.press(screen.getByLabelText('Save entry'));
+  await fireEvent.press(screen.getByLabelText('Save entry'));
   expect(screen.getAllByRole('alert').length).toBeGreaterThan(0);
   expect(mockSave).not.toHaveBeenCalled();
 });
