@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { communityRpc, comments, summaries, vote, type DiscussionComment, type Engagement, type VoteKind } from '@/lib/community';
 import { useAuth } from '@/providers/auth-provider';
 import { ProfileAvatar, ProfileButton, ProfileField, ProfileLink, ProfileMessage, ProfileText } from './profile/controls';
 import { PulseColors as C } from '@/constants/pulse-theme';
+// Direct import: the ./ui barrel pulls in providers that need a live Supabase client.
+import { VoteControl } from './ui/vote-control';
 
-export function VoteButtons({ kind, value, onChange }: { kind: VoteKind; value: Engagement; onChange: (value: Engagement) => void }) {
+// Optimistic voting with rollback; `cast` is a no-op until the engagement has loaded.
+export function useVote(kind: VoteKind, value: Engagement | undefined, onChange: (value: Engagement) => void) {
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
   const [error, setError] = useState('');
   async function cast(direction: number) {
-    if (locked.current) return;
+    if (!value || locked.current) return;
     locked.current = true; setBusy(true); setError('');
     const next = value.my_vote === direction ? 0 : direction;
     onChange({ ...value, score: Number(value.score) + next - value.my_vote, my_vote: next });
@@ -19,10 +22,15 @@ export function VoteButtons({ kind, value, onChange }: { kind: VoteKind; value: 
     catch (e) { onChange(value); setError((e as Error).message); }
     finally { locked.current = false; setBusy(false); }
   }
-  return <View style={{ gap: 6 }}><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-    {[1, -1].map(direction => <Pressable key={direction} accessibilityRole="button" accessibilityLabel={direction === 1 ? 'Upvote' : 'Downvote'} accessibilityState={{ selected: value.my_vote === direction, disabled: busy }} disabled={busy} onPress={() => void cast(direction)} style={{ minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: value.my_vote === direction ? C.pink : C.muted }}><ProfileText pink={value.my_vote === direction}>{direction === 1 ? '▲' : '▼'}</ProfileText></Pressable>)}
-    <View accessibilityLiveRegion="polite"><ProfileText>{value.score} points</ProfileText></View>
-  </View><ProfileMessage error text={error} /></View>;
+  return { busy, error, cast };
+}
+
+export function VoteButtons({ kind, value, onChange }: { kind: VoteKind; value: Engagement; onChange: (value: Engagement) => void }) {
+  const { busy, error, cast } = useVote(kind, value, onChange);
+  return <View style={{ gap: 6 }}>
+    <VoteControl score={Number(value.score)} myVote={value.my_vote} disabled={busy} onVote={direction => void cast(direction)} />
+    <ProfileMessage error text={error} />
+  </View>;
 }
 
 export function EventDiscussion({ eventId }: { eventId: string }) {
