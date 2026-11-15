@@ -15,6 +15,7 @@ const symbols = {
   chevronUp: ['chevron.up', 'keyboard_arrow_up'],
   clear: ['xmark.circle.fill', 'cancel'],
   close: ['xmark', 'close'],
+  comment: ['bubble.left', 'chat_bubble_outline'],
   date: ['calendar', 'calendar_today'],
   filter: ['line.3.horizontal.decrease', 'filter_list'],
   home: ['house', 'home'],

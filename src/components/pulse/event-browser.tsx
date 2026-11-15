@@ -3,49 +3,27 @@ import { communityRpc } from '@/lib/community';
 import { useAuth } from '@/providers/auth-provider';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 
-import { PulseColors as C, PulseRadius, PulseSpacing } from '@/constants/pulse-theme';
+import { PulseColors as C, PulseRadius } from '@/constants/pulse-theme';
 import { dateOptions, defaultEventFilters, eventCategories, validateEventFilters, type EventFilters } from '@/lib/event-filters';
 import { EVENTS_PER_PAGE, fetchEventById, type PulseEvent } from '@/lib/event-query';
 import { EventPhoto } from './ui/event-photo';
 import { InlineMessage } from './ui/feedback';
 import { supabase } from '@/lib/supabase';
 import { useEvents } from '@/providers/events-provider';
+import { useSavedEvents } from '@/providers/saved-events-provider';
 import { PreviewLink, PulseText, Screen, TitleHeader, usePulseScale } from './ui';
 import { EventActions } from './schedule/event-actions';
-import { EventDiscussion, VoteButtons } from './community';
+import { EventDiscussion } from './community';
 import { summaries, type Engagement } from '@/lib/community';
 import { ProfileLink, ProfileMessage } from './profile/controls';
 import { SaveEventButton } from './save-event-button';
-
-function eventDateLabel(value: string) {
-  const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-}
+import { EventCard, eventDateLabel } from './event-card';
 
 function EventDate({ value }: { value: string }) {
   return <PulseText size={14} color={C.muted}>{eventDateLabel(value)}</PulseText>;
 }
-
-// With a photo, the photo fills the card and the text sits on a scrim at the bottom.
-function EventCard({ event }: { event: PulseEvent }) {
-  const photo = event.pulse_image_path;
-  return <PreviewLink href={{ pathname: '/event', params: { id: event.id } }} label={`Open ${event.title}`} style={[cardStyles.card, photo ? cardStyles.photoCard : null]}>
-    {photo && <EventPhoto path={photo} scrim style={StyleSheet.absoluteFill} />}
-    <View style={cardStyles.body}>
-      <PulseText variant="label" tone="accent">{event.category}</PulseText>
-      <PulseText variant="title" numberOfLines={2}>{event.title}</PulseText>
-      <PulseText variant="label" tone={photo ? 'default' : 'muted'} numberOfLines={1}>{eventDateLabel(event.event_date)} · {event.location}</PulseText>
-    </View>
-  </PreviewLink>;
-}
-
-const cardStyles = StyleSheet.create({
-  card: { borderRadius: PulseRadius.lg, overflow: 'hidden', backgroundColor: C.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: C.border },
-  photoCard: { minHeight: 220, justifyContent: 'flex-end' },
-  body: { padding: PulseSpacing.lg, gap: PulseSpacing.xs },
-});
 
 function TextButton({ label, onPress }: { label: string; onPress: () => void }) {
   return <Pressable accessibilityRole="button" onPress={onPress} style={{ minHeight: 44, justifyContent: 'center' }}><PulseText color={C.pink}>{label}</PulseText></Pressable>;
@@ -54,6 +32,7 @@ function TextButton({ label, onPress }: { label: string; onPress: () => void }) 
 export function EventFeed() {
   const s = usePulseScale();
   const { events, filters, loading, error, count, page, changePage, refresh } = useEvents();
+  const saved = useSavedEvents();
   const [scores, setScores] = useState<Record<string, Engagement>>({});
   const [voteError, setVoteError] = useState('');
   useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
@@ -65,7 +44,9 @@ export function EventFeed() {
       {events.length === 0 && <View style={{ gap: 12 }}><PulseText size={20}>No matching events</PulseText><PulseText color={C.muted}>Try another category or date, or check back later.</PulseText><PreviewLink href="/filters" label="Change filters"><PulseText color={C.pink}>Change filters</PulseText></PreviewLink></View>}
       <ProfileLink href="/clubs" label="Discover clubs" />
       <ProfileMessage error text={voteError} />
-      {events.map(event => <View key={event.id} style={{ gap: PulseSpacing.sm }}><EventCard event={event} /><SaveEventButton id={event.id} title={event.title} />{scores[event.id] && <><VoteButtons kind="event" value={scores[event.id]} onChange={value => setScores(previous => ({ ...previous, [event.id]: value }))} /><ProfileLink href={{ pathname: '/event', params: { id: event.id } }} label={`${scores[event.id].comment_count} comments and replies`} /></>}</View>)}
+      {/* Shown once here; while it's set, every card's bookmark is disabled. */}
+      {saved.error && <View><ProfileMessage error text={saved.error} /><TextButton label="Retry saved events" onPress={saved.refresh} /></View>}
+      {events.map(event => <EventCard key={event.id} event={event} engagement={scores[event.id]} onEngagementChange={value => setScores(previous => ({ ...previous, [event.id]: value }))} />)}
       {count > EVENTS_PER_PAGE && <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         {page > 0 ? <TextButton label="Previous" onPress={() => changePage(page - 1)} /> : <View />}
         <PulseText size={14}>Page {page + 1} of {Math.ceil(count / EVENTS_PER_PAGE)}</PulseText>

@@ -5,7 +5,8 @@ import { useSavedEvents } from '@/providers/saved-events-provider';
 import { PulseIcon, PulseText } from './ui';
 import { Message } from './schedule/controls';
 
-export function SaveEventButton({ id, title }: { id: string; title: string }) {
+// `error` is this event's last failed write; the shared list's load error stays on useSavedEvents().
+export function useSaveEvent(id: string) {
   const saved = useSavedEvents();
   const [error, setError] = useState<string | null>(null);
   const selected = !!saved.data?.some(row => row.event_id === id);
@@ -15,6 +16,12 @@ export function SaveEventButton({ id, title }: { id: string; title: string }) {
     try { await saved.setSaved(id, !selected); }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save event.'); }
   }
+  return { selected, disabled, error, toggle };
+}
+
+export function SaveEventButton({ id, title }: { id: string; title: string }) {
+  const saved = useSavedEvents();
+  const { selected, disabled, error, toggle } = useSaveEvent(id);
   return <View style={{ gap: 6 }}>
     <Pressable accessibilityRole="button" accessibilityLabel={`${selected ? 'Unsave' : 'Save'} ${title}`} accessibilityState={{ selected, disabled }} disabled={disabled} onPress={() => void toggle()} style={{ minHeight: 48, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8, opacity: disabled ? 0.5 : 1 }}>
       <PulseIcon name={selected ? 'bookmarkFilled' : 'bookmark'} color={C.pink} size={24} />
