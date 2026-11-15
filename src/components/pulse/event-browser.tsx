@@ -34,17 +34,24 @@ function EventCard({ event }: { event: PulseEvent }) {
   return <PreviewLink href={{ pathname: '/event', params: { id: event.id } }} label={`Open ${event.title}`} style={[cardStyles.card, photo ? cardStyles.photoCard : null]}>
     {photo && <EventPhoto path={photo} scrim style={StyleSheet.absoluteFill} />}
     <View style={cardStyles.body}>
-      <PulseText variant="label" tone="accent">{event.category}</PulseText>
+      <View style={cardStyles.categoryBadge}><PulseText size={12} color={C.pink}>{event.category}</PulseText></View>
       <PulseText variant="title" numberOfLines={2}>{event.title}</PulseText>
-      <PulseText variant="label" tone={photo ? 'default' : 'muted'} numberOfLines={1}>{eventDateLabel(event.event_date)} · {event.location}</PulseText>
+      <View style={cardStyles.metaRow}>
+        <PulseText size={13} tone={photo ? 'default' : 'muted'} numberOfLines={1}>{eventDateLabel(event.event_date)}</PulseText>
+        <View style={cardStyles.metaDivider} />
+        <PulseText size={13} tone={photo ? 'default' : 'muted'} numberOfLines={1} style={{ flex: 1 }}>{event.location}</PulseText>
+      </View>
     </View>
   </PreviewLink>;
 }
 
 const cardStyles = StyleSheet.create({
-  card: { borderRadius: PulseRadius.lg, overflow: 'hidden', backgroundColor: C.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: C.border },
+  card: { borderRadius: PulseRadius.lg, overflow: 'hidden', backgroundColor: C.surfaceRaised, borderWidth: StyleSheet.hairlineWidth, borderColor: C.border },
   photoCard: { minHeight: 220, justifyContent: 'flex-end' },
   body: { padding: PulseSpacing.lg, gap: PulseSpacing.xs },
+  categoryBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: PulseRadius.pill, backgroundColor: 'rgba(255, 77, 141, 0.14)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255, 77, 141, 0.38)' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: PulseSpacing.sm, marginTop: PulseSpacing.xs },
+  metaDivider: { width: 3, height: 3, borderRadius: PulseRadius.pill, backgroundColor: C.pink },
 });
 
 function TextButton({ label, onPress }: { label: string; onPress: () => void }) {
