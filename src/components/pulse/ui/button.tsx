@@ -42,24 +42,30 @@ export function Button({ label, onPress, href, variant = 'secondary', compact = 
   return <Pressable ref={buttonRef} accessibilityRole="button" {...a11y} disabled={inactive} onPress={onPress} hitSlop={compact ? 4 : undefined} style={({ pressed }) => [base, (inactive || pressed) && styles.dimmed]}>{content}</Pressable>;
 }
 
-export function IconButton({ icon, label, onPress, href, color = C.textMuted, badge = 0 }: {
+export function IconButton({ icon, label, onPress, href, color = C.textMuted, badge = 0, disabled = false, selected, bordered = false }: {
   icon: PulseIconName;
   label: string;
   onPress?: () => void;
   href?: Href;
   color?: string;
   badge?: number;
+  disabled?: boolean;
+  selected?: boolean;
+  /** A filled, outlined square, for icon actions that sit beside a full button. */
+  bordered?: boolean;
 }) {
   const content = <>
     <PulseIcon name={icon} color={color} />
     {badge > 0 && <View style={styles.badge}><PulseText variant="caption" tone="onAccent">{badge > 99 ? '99+' : badge}</PulseText></View>}
   </>;
-  if (href) return <Link href={href} asChild><Pressable accessibilityRole="link" accessibilityLabel={label} style={styles.icon}>{content}</Pressable></Link>;
-  return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={styles.icon}>{content}</Pressable>;
+  const base = [styles.icon, bordered && styles.bordered];
+  if (href) return <Link href={href} asChild><Pressable accessibilityRole="link" accessibilityLabel={label} style={StyleSheet.flatten(base)}>{content}</Pressable></Link>;
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled, selected }} disabled={disabled} onPress={onPress} style={({ pressed }) => [base, (disabled || pressed) && styles.dimmed]}>{content}</Pressable>;
 }
 
 const styles = StyleSheet.create({
   icon: { width: PulseLayout.controlHeight, height: PulseLayout.controlHeight, alignItems: 'center', justifyContent: 'center' },
+  bordered: { borderRadius: PulseRadius.md, borderWidth: 1, borderColor: C.border, backgroundColor: C.surfaceRaised },
   badge: { position: 'absolute', top: PulseSpacing.xs, right: 0, minWidth: 18, paddingHorizontal: PulseSpacing.xs, borderRadius: PulseRadius.pill, backgroundColor: C.accent, alignItems: 'center' },
   base: {
     minHeight: PulseLayout.controlHeight,

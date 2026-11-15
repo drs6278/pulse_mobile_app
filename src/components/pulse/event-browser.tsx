@@ -1,29 +1,16 @@
-import { useEventPermission } from '@/hooks/use-event-permission';
-import { communityRpc } from '@/lib/community';
-import { useAuth } from '@/providers/auth-provider';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 
-import { PulseColors as C, PulseRadius } from '@/constants/pulse-theme';
+import { PulseColors as C } from '@/constants/pulse-theme';
 import { dateOptions, defaultEventFilters, eventCategories, validateEventFilters, type EventFilters } from '@/lib/event-filters';
-import { EVENTS_PER_PAGE, fetchEventById, type PulseEvent } from '@/lib/event-query';
-import { EventPhoto } from './ui/event-photo';
-import { InlineMessage } from './ui/feedback';
-import { supabase } from '@/lib/supabase';
+import { EVENTS_PER_PAGE } from '@/lib/event-query';
 import { useEvents } from '@/providers/events-provider';
 import { useSavedEvents } from '@/providers/saved-events-provider';
 import { PreviewLink, PulseText, Screen, TitleHeader, usePulseScale } from './ui';
-import { EventActions } from './schedule/event-actions';
-import { EventDiscussion } from './community';
 import { summaries, type Engagement } from '@/lib/community';
 import { ProfileLink, ProfileMessage } from './profile/controls';
-import { SaveEventButton } from './save-event-button';
-import { EventCard, eventDateLabel } from './event-card';
-
-function EventDate({ value }: { value: string }) {
-  return <PulseText size={14} color={C.muted}>{eventDateLabel(value)}</PulseText>;
-}
+import { EventCard } from './event-card';
 
 function TextButton({ label, onPress }: { label: string; onPress: () => void }) {
   return <Pressable accessibilityRole="button" onPress={onPress} style={{ minHeight: 44, justifyContent: 'center' }}><PulseText color={C.pink}>{label}</PulseText></Pressable>;
@@ -94,48 +81,4 @@ export function EventFiltersScreen() {
       {error && <View accessibilityRole="alert"><PulseText color={C.pink}>{error}</PulseText></View>}
     </View>
   </Screen>;
-}
-
-export function SupabaseEventScreen({ id, photoError }: { id: string; photoError?: string }) {
-  const { session } = useAuth();
-  const [result, setResult] = useState<{ key: string; event: PulseEvent | null; error: string | null } | null>(null);
-  const [revision, setRevision] = useState(0);
-  useFocusEffect(useCallback(() => { setRevision(value => value + 1); }, []));
-  const key = `${id}:${revision}`;
-  const current = result?.key === key ? result : null;
-  const loading = !current;
-  const event = current?.event;
-  const allowed = useEventPermission(event, session?.user.id);
-  const error = current?.error;
-  useEffect(() => {
-    const controller = new AbortController();
-    let active = true;
-    void (async () => {
-      try {
-        // Existing discovery/details remain usable before scheduling is deployed.
-        const data = await fetchEventById(supabase, id, controller.signal, { allowBasic: true });
-        if (active) setResult({ key, event: data, error: data ? null : 'This event is no longer available.' });
-      } catch {
-        if (active) setResult({ key, event: null, error: 'Unable to load this event. Please try again.' });
-      }
-    })();
-    return () => { active = false; controller.abort(); };
-  }, [id, key]);
-  return <Screen onRefresh={() => setRevision(value => value + 1)} refreshing={loading} header={<TitleHeader title="Event details" right={<TextButton label="Refresh" onPress={() => setRevision(value => value + 1)} />} />}><View style={{ padding: 16, gap: 16 }}>
-    <InlineMessage text={photoError ? `Your event was posted, but the photo didn’t upload: ${photoError} You can add it from Edit event.` : null} error />
-    {loading ? <ActivityIndicator accessibilityLabel="Loading event" color={C.pink} /> : error ? <View accessibilityRole="alert"><PulseText>{error}</PulseText><TextButton label="Try again" onPress={() => setRevision(value => value + 1)} /></View> : event && <>
-      {event.pulse_image_path && <EventPhoto path={event.pulse_image_path} style={{ height: 220, borderRadius: PulseRadius.lg }} />}
-      <PulseText color={C.pink}>{event.category}</PulseText><PulseText size={28} font="black">{event.title}</PulseText><EventDate value={event.event_date} /><PulseText>{event.location}</PulseText>
-      {!!event.pulse_age_min && <PulseText size={14}>{event.pulse_age_min}+ · Self-reported age eligibility required</PulseText>}
-      {event.created_by && <PreviewLink href={{ pathname: '/student-profile', params: { id: event.created_by } }} label="View organizer profile" style={{ minHeight: 48, justifyContent: 'center' }}><PulseText color={C.pink}>View organizer profile ›</PulseText></PreviewLink>}
-      {event.pulse_all_day_start && <PulseText size={14}>All day: {event.pulse_all_day_start} through {event.pulse_all_day_end} (exclusive end; {event.pulse_timezone ?? 'UTC'})</PulseText>}
-      {event.pulse_starts_at && <PulseText size={14}>{new Date(event.pulse_starts_at).toLocaleString(undefined, { timeZone: event.pulse_timezone ?? 'UTC' })} – {event.pulse_ends_at ? new Date(event.pulse_ends_at).toLocaleString(undefined, { timeZone: event.pulse_timezone ?? 'UTC' }) : 'Time unavailable'} ({event.pulse_timezone ?? 'UTC'})</PulseText>}
-      {event.club_id && <ProfileLink href={{ pathname: '/clubs', params: { id: event.club_id } }} label="View hosting club" />}
-      {allowed && <PreviewLink href={{ pathname: '/edit-event', params: { id: event.id } }} label="Edit event" style={{ minHeight: 48, justifyContent: 'center' }}><PulseText color={C.pink}>Edit event</PulseText></PreviewLink>}
-      {allowed && event.club_id && <TextButton label="Cancel club event" onPress={() => { void communityRpc('cancel_club_event', { p_event: event.id }).then(() => setRevision(v => v + 1)).catch(() => setResult({ key, event, error: 'Unable to cancel club event. Refresh and try again.' })); }} />}
-      <EventActions key={String(event.id)} event={event} />
-      <SaveEventButton key={`save:${event.id}`} id={event.id} title={event.title} />
-      <EventDiscussion key={`discussion:${session?.user.id}:${event.id}:${revision}`} eventId={event.id} />
-    </>}
-  </View></Screen>;
 }

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { eventColumns, type PulseEvent } from './event-query';
+import { eventColumns, eventPhotoColumn, missingColumn, type PulseEvent } from './event-query';
 
 export type SavedEvent = { event_id: string; created_at: string; event: PulseEvent | null };
 export function savedEventsError(reason: unknown) {
@@ -10,11 +10,15 @@ export function savedEventsError(reason: unknown) {
 }
 export async function loadSavedEvents(client: SupabaseClient, user: string, signal: AbortSignal) {
   const rows: SavedEvent[] = [];
+  // Photos are optional until the event-photo migration is applied, as in fetchEvents.
+  let columns = `${eventColumns},${eventPhotoColumn}`;
   for (let offset = 0; ; offset += 500) {
-    const { data, error } = await client.from('saved_events')
-      .select(`event_id::text,created_at,event:events(${eventColumns})`).eq('user_id', user)
+    const page = (select: string) => client.from('saved_events')
+      .select(`event_id::text,created_at,event:events(${select})`).eq('user_id', user)
       .order('created_at', { ascending: false }).order('event_id').range(offset, offset + 499)
       .abortSignal(signal).returns<SavedEvent[]>();
+    let { data, error } = await page(columns);
+    if (missingColumn(error) && columns !== eventColumns) ({ data, error } = await page(columns = eventColumns));
     if (error) throw new Error(savedEventsError(error));
     rows.push(...data ?? []);
     if ((data?.length ?? 0) < 500) return rows;

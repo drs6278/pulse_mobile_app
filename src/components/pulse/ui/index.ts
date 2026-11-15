@@ -6,6 +6,7 @@ export * from './feedback';
 export * from './icon';
 export * from './layout';
 export * from './scale';
+export * from './segmented-control';
 export * from './surfaces';
 export * from './text';
 export * from './text-field';

@@ -25,7 +25,7 @@ export const eventDetailsColumns = `${eventColumns},pulse_starts_at,pulse_ends_a
 export const EVENTS_PER_PAGE = 20;
 // Optional until the event-photo migration is applied everywhere.
 export const eventPhotoColumn = 'pulse_image_path';
-const missingColumn = (error: { code?: string } | null) => ['42703', 'PGRST204'].includes(error?.code ?? '');
+export const missingColumn = (error: { code?: string } | null) => ['42703', 'PGRST204'].includes(error?.code ?? '');
 
 // Loads one event with as much detail as the server supports. `allowBasic`
 // accepts servers without scheduling columns, for read-only screens.

@@ -9,7 +9,16 @@ const mockRefresh = jest.fn();
 let mockData: SavedEvent[] = [];
 let mockLoading = false;
 jest.mock('@/providers/saved-events-provider', () => ({ useSavedEvents: () => ({ data: mockData, loading: mockLoading, busy: false, error: null, refresh: mockRefresh, setSaved: mockSetSaved }) }));
-jest.mock('expo-router', () => ({ useFocusEffect: () => {} }));
+jest.mock('expo-router', () => {
+  const { View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return { useFocusEffect: () => {}, Link: ({ children, href }: { children: React.ReactNode; href: unknown }) => <View testID={JSON.stringify(href)}>{children}</View> };
+});
+// The saved list renders the shared EventCard, which reaches these modules directly.
+jest.mock('@/lib/community', () => ({ vote: jest.fn(), summaries: jest.fn(async () => []) }));
+jest.mock('@/providers/auth-provider', () => ({ useAuth: () => ({ session: null }) }));
+jest.mock('@/providers/events-provider', () => ({ useEvents: () => ({}) }));
+jest.mock('@/providers/notifications-provider', () => ({ useNotifications: () => ({ unread: 0 }) }));
+jest.mock('../ui/event-photo', () => ({ EventPhoto: () => null }));
 jest.mock('../ui', () => {
   const { Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
   return {
@@ -46,8 +55,9 @@ test('saved list shows real event details and a link using its ID', async () => 
   mockData = [row];
   const screen = await render(<SavedEventsScreen />);
   expect(screen.getByText('Concert')).toBeTruthy();
-  expect(screen.getByText('Hall')).toBeTruthy();
-  expect(screen.getByLabelText(JSON.stringify({ pathname: '/event', params: { id: row.event_id } }))).toBeTruthy();
+  expect(screen.getByText(/Hall/)).toBeTruthy();
+  expect(screen.getAllByTestId(JSON.stringify({ pathname: '/event', params: { id: row.event_id } })).length).toBeGreaterThan(0);
+  expect(screen.getByLabelText('Unsave Concert')).toBeTruthy();
 });
 test('unavailable bookmarks remain removable', async () => {
   mockData = [{ ...row, event: null }];

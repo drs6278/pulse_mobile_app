@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { ActionSheet } from '../action-sheet';
 import { Button, IconButton } from '../button';
 import { ChipGroup } from '../chip-group';
+import { SegmentedControl } from '../segmented-control';
 import { ListRow } from '../surfaces';
 import { TextField } from '../text-field';
 import { VoteControl } from '../vote-control';
@@ -101,6 +102,25 @@ describe('ListRow', () => {
     await render(<ListRow label="Sign out" onPress={onPress} danger />);
     await fireEvent.press(screen.getByRole('button', { name: 'Sign out' }));
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SegmentedControl', () => {
+  it('marks the current option and reports a new choice', async () => {
+    const onChange = jest.fn();
+    await render(<SegmentedControl label="Sort comments" options={['Newest', 'Top'] as const} value="Newest" onChange={onChange} />);
+    expect(screen.getByRole('radio', { name: 'Sort comments: Newest', checked: true })).toBeTruthy();
+    await fireEvent.press(screen.getByRole('radio', { name: 'Sort comments: Top' }));
+    expect(onChange).toHaveBeenCalledWith('Top');
+  });
+});
+
+describe('IconButton states', () => {
+  it('reports selection and ignores presses while disabled', async () => {
+    const onPress = jest.fn();
+    await render(<IconButton icon="bookmark" label="Save Concert" bordered selected disabled onPress={onPress} />);
+    await fireEvent.press(screen.getByRole('button', { name: 'Save Concert', selected: true, disabled: true }));
+    expect(onPress).not.toHaveBeenCalled();
   });
 });
 

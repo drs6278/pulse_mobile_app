@@ -76,11 +76,13 @@ export function BottomBar({ active }: { active?: Tab }) {
   </View>;
 }
 
-export function Screen({ children, header, activeTab, bottomBar = false, action, actionHref, onAction, overlay, scroll = true, onRefresh, refreshing = false }: {
+export function Screen({ children, header, activeTab, bottomBar = false, action, actionHref, onAction, footer, overlay, scroll = true, onRefresh, refreshing = false }: {
   children: ReactNode;
   header: ReactNode;
   activeTab?: Tab;
   bottomBar?: boolean;
+  /** Custom content for the pinned footer; takes the place of `action`. */
+  footer?: ReactNode;
   action?: string;
   actionHref?: Href;
   onAction?: () => void;
@@ -95,7 +97,8 @@ export function Screen({ children, header, activeTab, bottomBar = false, action,
       {children}
     </ScrollView> : <View style={styles.fill}>{children}</View>}
     {bottomBar && <BottomBar active={activeTab} />}
-    {action && <View style={styles.footer}><Button label={action} variant="primary" onPress={onAction} href={onAction ? undefined : actionHref} disabled={!onAction && !actionHref} /></View>}
+    {footer ? <View style={styles.footer}>{footer}</View>
+      : action && <View style={styles.footer}><Button label={action} variant="primary" onPress={onAction} href={onAction ? undefined : actionHref} disabled={!onAction && !actionHref} /></View>}
     {overlay}
   </SafeAreaView></View>;
 }

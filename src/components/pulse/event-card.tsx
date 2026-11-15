@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, type Href } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { PulseColors as C, PulseLayout, PulseRadius, PulseSpacing } from '@/constants/pulse-theme';
@@ -12,6 +12,19 @@ import { PulseIcon } from './ui/icon';
 import { PreviewLink } from './ui/layout';
 import { PulseText } from './ui/text';
 import { VoteControl } from './ui/vote-control';
+
+// A link on the feed card; plain text on the event page, where the discussion is already below.
+export function CommentCountPill({ count, href }: { count: number; href?: Href }) {
+  const label = `${count} comments and replies`;
+  const content = <>
+    <PulseIcon name="comment" size={18} />
+    <PulseText variant="label" tone="muted">{count}</PulseText>
+  </>;
+  if (!href) return <View accessible accessibilityLabel={label} style={styles.pill}>{content}</View>;
+  return <Link href={href} asChild>
+    <Pressable accessibilityRole="link" accessibilityLabel={label} hitSlop={4} style={styles.pill}>{content}</Pressable>
+  </Link>;
+}
 
 export function eventDateLabel(value: string) {
   const [year, month, day] = value.split('-').map(Number);
@@ -43,12 +56,7 @@ export function EventCard({ event, engagement, onEngagementChange }: {
       <View style={styles.actions}>
         {engagement && <>
           <VoteControl score={Number(engagement.score)} myVote={engagement.my_vote} disabled={votes.busy} onVote={direction => void votes.cast(direction)} />
-          <Link href={href} asChild>
-            <Pressable accessibilityRole="link" accessibilityLabel={`${engagement.comment_count} comments and replies`} hitSlop={4} style={styles.pill}>
-              <PulseIcon name="comment" size={18} />
-              <PulseText variant="label" tone="muted">{engagement.comment_count}</PulseText>
-            </Pressable>
-          </Link>
+          <CommentCountPill count={engagement.comment_count} href={href} />
         </>}
         <Pressable
           accessibilityRole="button"
