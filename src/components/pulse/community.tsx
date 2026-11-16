@@ -22,20 +22,43 @@ export function useVote(kind: VoteKind, value: Engagement | undefined, onChange:
   const [error, setError] = useState('');
   async function cast(direction: number) {
     if (!value || locked.current) return;
-    locked.current = true; setBusy(true); setError('');
+    locked.current = true;
+    setBusy(true);
+    setError('');
     const next = value.my_vote === direction ? 0 : direction;
     onChange({ ...value, score: Number(value.score) + next - value.my_vote, my_vote: next });
-    try { const result = await vote(kind, value.id, next); if (!result[0]) throw new Error('Voting unavailable.'); onChange(result[0]); }
-    catch (e) { onChange(value); setError((e as Error).message); }
-    finally { locked.current = false; setBusy(false); }
+    try {
+      const result = await vote(kind, value.id, next);
+      if (!result[0]) throw new Error('Voting unavailable.');
+      onChange(result[0]);
+    } catch (e) {
+      onChange(value);
+      setError((e as Error).message);
+    } finally {
+      locked.current = false;
+      setBusy(false);
+    }
   }
   return { busy, error, cast };
 }
 
-export function VoteButtons({ kind, value, onChange }: { kind: VoteKind; value: Engagement; onChange: (value: Engagement) => void }) {
+export function VoteButtons({
+  kind,
+  value,
+  onChange,
+}: {
+  kind: VoteKind;
+  value: Engagement;
+  onChange: (value: Engagement) => void;
+}) {
   const { busy, error, cast } = useVote(kind, value, onChange);
   return <View style={{ gap: 6 }}>
-    <VoteControl score={Number(value.score)} myVote={value.my_vote} disabled={busy} onVote={direction => void cast(direction)} />
+    <VoteControl
+      score={Number(value.score)}
+      myVote={value.my_vote}
+      disabled={busy}
+      onVote={direction => void cast(direction)}
+    />
     <ProfileMessage error text={error} />
   </View>;
 }
@@ -84,7 +107,19 @@ export function EventDiscussion({ eventId, onCommentsChanged }: { eventId: strin
   </View>;
 }
 
-function CommentBranch({ eventId, parent, top, depth, refresh }: { eventId: string; parent: string | null; top: boolean; depth: number; refresh: () => void }) {
+function CommentBranch({
+  eventId,
+  parent,
+  top,
+  depth,
+  refresh,
+}: {
+  eventId: string;
+  parent: string | null;
+  top: boolean;
+  depth: number;
+  refresh: () => void;
+}) {
   const [items, setItems] = useState<DiscussionComment[]>([]);
   const [offset, setOffset] = useState(0);
   const [more, setMore] = useState(false);
@@ -102,6 +137,9 @@ function CommentBranch({ eventId, parent, top, depth, refresh }: { eventId: stri
 
 const stampFormat = { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' } as const;
 
+// The server replaces a comment's body with this text when a report is upheld.
+const REMOVED_BODY = '[Comment removed after moderation review]';
+
 function CommentItem({ item, eventId, top, depth, refresh }: { item: DiscussionComment; eventId: string; top: boolean; depth: number; refresh: () => void }) {
   const { session } = useAuth();
   const [engagement, setEngagement] = useState<Engagement>({ ...item, comment_count: 0 });
@@ -113,8 +151,18 @@ function CommentItem({ item, eventId, top, depth, refresh }: { item: DiscussionC
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function action(name: string, args: Record<string, unknown>) {
-    setBusy(true); setError('');
-    try { await communityRpc(name, args); setMode(null); setBody(''); refresh(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    setBusy(true);
+    setError('');
+    try {
+      await communityRpc(name, args);
+      setMode(null);
+      setBody('');
+      refresh();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
   const open = (next: 'reply' | 'edit' | 'report', initial = '') => { setMode(next); setBody(initial); };
   const mine = !!item.author_id && item.author_id === session?.user.id;
@@ -139,7 +187,9 @@ function CommentItem({ item, eventId, top, depth, refresh }: { item: DiscussionC
           </View>
           {item.author_id && <IconButton icon="more" label="Comment options" onPress={() => setMenuOpen(true)} />}
         </View>
-        <PulseText variant="body">{item.body}</PulseText>
+        {item.body === REMOVED_BODY
+          ? <PulseText variant="body" tone="muted">Comment removed after moderation review.</PulseText>
+          : <PulseText variant="body">{item.body}</PulseText>}
         {(item.author_id || item.reply_count > 0) && <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: PulseSpacing.xs }}>
           {item.author_id && <>
             <VoteControl score={Number(engagement.score)} myVote={engagement.my_vote} disabled={votes.busy} onVote={direction => void votes.cast(direction)} />

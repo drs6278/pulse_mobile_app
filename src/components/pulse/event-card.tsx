@@ -47,9 +47,13 @@ export function EventCard({ event, engagement, onEngagementChange }: {
     <PreviewLink href={href} label={`Open ${event.title}`} style={photo ? styles.photoLink : undefined}>
       {photo && <EventPhoto path={photo} scrim style={StyleSheet.absoluteFill} />}
       <View style={styles.body}>
-        <PulseText variant="label" tone="accent">{event.category}</PulseText>
+        <View style={styles.categoryBadge}><PulseText size={12} color={C.pink}>{event.category}</PulseText></View>
         <PulseText variant="title" numberOfLines={2}>{event.title}</PulseText>
-        <PulseText variant="label" tone={photo ? 'default' : 'muted'} numberOfLines={1}>{eventDateLabel(event.event_date)} · {event.location}</PulseText>
+        <View style={styles.metaRow}>
+          <PulseText size={13} tone={photo ? 'default' : 'muted'} numberOfLines={1}>{eventDateLabel(event.event_date)}</PulseText>
+          <View style={styles.metaDivider} />
+          <PulseText size={13} tone={photo ? 'default' : 'muted'} numberOfLines={1} style={{ flex: 1 }}>{event.location}</PulseText>
+        </View>
       </View>
     </PreviewLink>
     <View style={styles.footer}>
@@ -75,9 +79,12 @@ export function EventCard({ event, engagement, onEngagementChange }: {
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: PulseRadius.lg, overflow: 'hidden', backgroundColor: C.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: C.border },
+  card: { borderRadius: PulseRadius.lg, overflow: 'hidden', backgroundColor: C.surfaceRaised, borderWidth: StyleSheet.hairlineWidth, borderColor: C.border },
   photoLink: { minHeight: 220, justifyContent: 'flex-end' },
   body: { padding: PulseSpacing.lg, gap: PulseSpacing.xs },
+  categoryBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: PulseRadius.pill, backgroundColor: 'rgba(255, 77, 141, 0.14)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255, 77, 141, 0.38)' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: PulseSpacing.sm, marginTop: PulseSpacing.xs },
+  metaDivider: { width: 3, height: 3, borderRadius: PulseRadius.pill, backgroundColor: C.pink },
   footer: { paddingHorizontal: PulseSpacing.md, paddingVertical: PulseSpacing.sm, gap: PulseSpacing.xs, borderTopWidth: StyleSheet.hairlineWidth, borderColor: C.border },
   actions: { flexDirection: 'row', alignItems: 'center', gap: PulseSpacing.sm },
   pill: { height: PulseLayout.compactControlHeight, paddingHorizontal: PulseSpacing.md, borderRadius: PulseRadius.pill, backgroundColor: C.surfaceRaised, flexDirection: 'row', alignItems: 'center', gap: PulseSpacing.xs },
