@@ -16,6 +16,10 @@ const symbols = {
   clear: ['xmark.circle.fill', 'cancel'],
   close: ['xmark', 'close'],
   comment: ['bubble.left', 'chat_bubble_outline'],
+  edit: ['pencil', 'edit'],
+  flag: ['flag', 'flag'],
+  reply: ['arrowshape.turn.up.left', 'reply'],
+  trash: ['trash', 'delete'],
   date: ['calendar', 'calendar_today'],
   filter: ['line.3.horizontal.decrease', 'filter_list'],
   home: ['house', 'home'],
@@ -36,9 +40,30 @@ const symbols = {
 
 export type PulseIconName = keyof typeof symbols;
 
-export function PulseIcon({ name, size = 24, color = C.textMuted }: { name: PulseIconName; size?: number; color?: string }) {
+export function PulseIcon({
+  name,
+  size = 24,
+  color = C.textMuted,
+}: {
+  name: PulseIconName;
+  size?: number;
+  color?: string;
+}) {
   const [ios, material] = symbols[name];
-  return <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <SymbolView name={{ ios, android: material, web: material }} size={size} tintColor={color} />
-  </View>;
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <SymbolView
+        name={{ ios, android: material, web: material }}
+        size={size}
+        tintColor={color}
+      />
+    </View>
+  );
 }

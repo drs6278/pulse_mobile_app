@@ -129,7 +129,30 @@ export function SupabaseEventScreen({ id, photoError }: { id: string; photoError
       {!!event.pulse_age_min && <PulseText size={14}>{event.pulse_age_min}+ · Self-reported age eligibility required</PulseText>}
       {event.created_by && <PreviewLink href={{ pathname: '/student-profile', params: { id: event.created_by } }} label="View organizer profile" style={{ minHeight: 48, justifyContent: 'center' }}><PulseText color={C.pink}>View organizer profile ›</PulseText></PreviewLink>}
       {event.pulse_all_day_start && <PulseText size={14}>All day: {event.pulse_all_day_start} through {event.pulse_all_day_end} (exclusive end; {event.pulse_timezone ?? 'UTC'})</PulseText>}
-      {event.pulse_starts_at && <PulseText size={14}>{new Date(event.pulse_starts_at).toLocaleString(undefined, { timeZone: event.pulse_timezone ?? 'UTC' })} – {event.pulse_ends_at ? new Date(event.pulse_ends_at).toLocaleString(undefined, { timeZone: event.pulse_timezone ?? 'UTC' }) : 'Time unavailable'} ({event.pulse_timezone ?? 'UTC'})</PulseText>}
+      {event.pulse_starts_at && (
+        <PulseText size={13} numberOfLines={1}>
+          {new Date(event.pulse_starts_at).toLocaleDateString(undefined, {
+            timeZone: event.pulse_timezone ?? 'UTC',
+            month: 'short',
+            day: 'numeric',
+          })}
+          {' · '}
+          {new Date(event.pulse_starts_at).toLocaleTimeString(undefined, {
+            timeZone: event.pulse_timezone ?? 'UTC',
+            hour: 'numeric',
+            minute: '2-digit',
+          })}
+          {' – '}
+          {event.pulse_ends_at
+            ? new Date(event.pulse_ends_at).toLocaleTimeString(undefined, {
+                timeZone: event.pulse_timezone ?? 'UTC',
+                hour: 'numeric',
+                minute: '2-digit',
+              })
+            : 'Time unavailable'}{' '}
+          ({event.pulse_timezone ?? 'UTC'})
+        </PulseText>
+      )}
       {event.club_id && <ProfileLink href={{ pathname: '/clubs', params: { id: event.club_id } }} label="View hosting club" />}
       {allowed && <PreviewLink href={{ pathname: '/edit-event', params: { id: event.id } }} label="Edit event" style={{ minHeight: 48, justifyContent: 'center' }}><PulseText color={C.pink}>Edit event</PulseText></PreviewLink>}
       {allowed && event.club_id && <TextButton label="Cancel club event" onPress={() => { void communityRpc('cancel_club_event', { p_event: event.id }).then(() => setRevision(v => v + 1)).catch(() => setResult({ key, event, error: 'Unable to cancel club event. Refresh and try again.' })); }} />}
