@@ -1,18 +1,15 @@
 // Generated from src/lib/schedule/import/process-source.ts; regenerate with prepare-delivery.mjs.
 import { MAX_FILE_BYTES } from '../types.js';
 import { localDate, validZone } from '../time.js';
-import { parseCSV } from './csv.js';
 import { parseICS } from './ics.js';
 export function parseScheduleSource(text, format, timezone, termEnd) {
     if (!validZone(timezone) || !localDate(termEnd))
         throw new Error('Enter a valid IANA timezone and semester end.');
     if (!text.trim() || text.includes('\0'))
-        throw new Error('Choose a nonempty UTF-8 calendar or CSV file.');
+        throw new Error('Choose a nonempty UTF-8 ICS calendar file.');
     if (format === 'ics')
         return parseICS(text, timezone, termEnd);
-    if (format === 'csv')
-        return parseCSV(text, timezone, termEnd);
-    throw new Error('Only ICS and CSV imports are supported.');
+    throw new Error('Only ICS imports are supported.');
 }
 /** Runs only in the Edge Function. Shares the exact parser used by unit tests. */
 export async function processScheduleSource(client, userId, input) {
@@ -23,13 +20,15 @@ export async function processScheduleSource(client, userId, input) {
         throw new Error('This upload is unavailable. Choose the file again.');
     if (source.cleanup_requested || Date.parse(source.created_at) < Date.now() - 86400000)
         throw new Error('This upload has expired. Choose the file again.');
+    if (source.format !== 'ics')
+        throw new Error('Only ICS imports are supported.');
     if (source.object_path !== `${userId}/${source.id}.${source.format}`)
         throw new Error('Invalid upload path.');
     const downloaded = await client.storage.from('schedule-sources').download(source.object_path);
     if (downloaded.error || !downloaded.data)
         throw new Error('Unable to read the private upload. Choose the file again.');
     const blob = downloaded.data;
-    const expectedType = source.format === 'ics' ? 'text/calendar' : 'text/csv';
+    const expectedType = 'text/calendar';
     if (blob.type.split(';')[0] !== expectedType)
         throw new Error('The uploaded file type does not match its format.');
     if (!blob.size || blob.size > MAX_FILE_BYTES)

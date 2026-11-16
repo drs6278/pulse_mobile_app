@@ -4,10 +4,33 @@ import { parseCSV, CSV_HEADER } from '../import/csv';
 import { parseICS } from '../import/ics';
 import { compareImport } from '../import/deduplication';
 import { serializeEvent } from '../../calendar/ics';
+import { expandSchedule } from '../recurrence';
+import type { ScheduleSeries } from '../types';
+import { DateTime } from 'luxon';
 
 const calendar = (entries: string) => `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\n${entries}\r\nEND:VCALENDAR`;
 const entry = (extra = '') => `BEGIN:VEVENT\r\nUID:cs101@test\r\nSUMMARY:CS 101\r\nDTSTART;TZID=America/New_York:20261026T090000\r\nDTEND;TZID=America/New_York:20261026T100000\r\n${extra}\r\nEND:VEVENT`;
 describe('imports', () => {
+  test('old ongoing weekly calendars fit the import window and preserve recurrence phase', () => {
+    const text = calendar(entry('RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE').replaceAll('20261026', '20240826'));
+    const result = parseICS(text, 'America/New_York', '2027-03-13');
+    expect(result.errors).toEqual([]);
+    expect(result.candidates[0].issues).toEqual([]);
+    expect(result.warnings[0]).toContain('Earlier occurrences are omitted');
+    const draft = result.candidates[0].draft;
+    const anchor = DateTime.fromISO('2024-08-26', { zone: 'UTC' });
+    const dates = expandSchedule({ ...draft, id: 'test' } as ScheduleSeries, [], {
+      start: DateTime.fromISO('2026-11-01', { zone: draft.timezone }).toMillis(),
+      end: DateTime.fromISO('2026-12-01', { zone: draft.timezone }).toMillis(),
+    });
+    expect(dates.length).toBeGreaterThan(0);
+    for (const date of dates) {
+      const local = DateTime.fromISO(date.recurrenceKey, { zone: 'UTC' });
+      expect([1, 3]).toContain(local.weekday);
+      expect(Math.floor(local.startOf('day').diff(anchor, 'days').days / 7) % 2).toBe(0);
+      expect(local.hour).toBe(9);
+    }
+  });
   test('CSV handles BOM, quoted commas and semester-to-weekday alignment', () => {
     const result = parseCSV(`\uFEFF${CSV_HEADER}\n"CS, systems",class,Library,MO|WE,09:00,10:00,2026-10-25,2026-12-01,America/New_York`, 'UTC', '2026-12-01');
     expect(result.candidates[0].issues).toEqual([]);

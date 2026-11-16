@@ -53,7 +53,7 @@ async function run() {
       if (message.id) { const task = pending.get(message.id); if (task) { pending.delete(message.id); if (message.error) task.reject(new Error(message.error.message)); else task.resolve(message.result); } return; }
       if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails.text);
       if (message.method === 'Fetch.requestPaused') void respond(message.params).catch(error => errors.push(error.message));
-      if (message.method === 'Page.fileChooserOpened') void call('DOM.setFileInputFiles', { files: [path.resolve('tests/fixtures/schedules/fall.csv')], backendNodeId: message.params.backendNodeId }).catch(error => errors.push(error.message));
+      if (message.method === 'Page.fileChooserOpened') void call('DOM.setFileInputFiles', { files: [path.resolve('tests/fixtures/schedules/fall.ics')], backendNodeId: message.params.backendNodeId }).catch(error => errors.push(error.message));
     };
     async function respond({ requestId, request }) {
       const url = new URL(request.url);
@@ -72,8 +72,8 @@ async function run() {
           rows = rows.filter(item => item.id !== saved.id); rows.push(saved); body = saved;
         } else if (route === 'event_rsvps') { rsvps = [{ event_id: event.id, status: payload.status, event }]; body = rsvps; }
         else if (route === 'create_schedule_source') {
-          const id = '00000000-0000-0000-0000-000000000099'; body = { id, object_path: `${user.id}/${id}.csv`, label: payload.p_label, format: payload.p_format }; sources.push(body);
-        } else if (route === 'schedule-source') body = payload.action === 'cleanup' ? { removed: sources.length, failed: 0 } : parseScheduleSource(fs.readFileSync('tests/fixtures/schedules/fall.csv', 'utf8'), 'csv', payload.timezone, payload.termEnd);
+          const id = '00000000-0000-0000-0000-000000000099'; body = { id, object_path: `${user.id}/${id}.ics`, label: payload.p_label, format: payload.p_format }; sources.push(body);
+        } else if (route === 'schedule-source') body = payload.action === 'cleanup' ? { removed: sources.length, failed: 0 } : parseScheduleSource(fs.readFileSync('tests/fixtures/schedules/fall.ics', 'utf8'), 'ics', payload.timezone, payload.termEnd);
         else if (route === 'finish_schedule_source_cleanup' || route === 'discard_schedule_source') { sources = []; body = null; }
         else if (route === 'commit_schedule_import') {
           const id = '00000000-0000-0000-0000-000000000004'; imports.push({ id, label: payload.p_label, created_at: new Date().toISOString() });
@@ -124,11 +124,11 @@ async function run() {
     await waitFor('Date & time'); await input('Title', 'Edited synthetic class'); await click('Save entry'); await waitFor('Your calendar');
     assert(rows.some(item => item.title === 'Edited synthetic class'), 'One-off title edit did not save');
     await visit('/event?id=event-1', 'Synthetic campus concert'); await click('RSVP — I’m going'); await waitFor('Cancel RSVP'); assert(writes.includes('event_rsvps'));
-    await visit('/import-schedule', 'Choose ICS or CSV file'); await click('Choose ICS or CSV file'); await waitFor('Computer Science');
+    await visit('/import-schedule', 'Choose ICS file'); await click('Choose ICS file'); await waitFor('Computer Science');
     assert(writes.includes('create_schedule_source') && writes.includes('storage-POST') && writes.includes('schedule-source'), 'Upload/parse missing');
     assert(!writes.includes('commit_schedule_import'), 'Import saved before review');
     await click('Correct entry: Computer Science'); await input('Title', 'Corrected Computer Science');
-    await screenshot('import-correction'); await click('Confirm timezone, selections and updates'); await click('Save 2 selected entries'); await waitFor('Your calendar');
+    await screenshot('import-correction'); await click('Confirm timezone, selections and updates'); await click('Save 1 selected entries'); await waitFor('Your calendar');
     assert(rows.some(item => item.title === 'Corrected Computer Science'), 'Corrected preview not saved');
     assert(writes.includes('storage-DELETE') && writes.includes('finish_schedule_source_cleanup'), 'Source cleanup missing');
     await visit('/schedule-settings', 'Manage schedule entries'); await input('Find a class or commitment', 'Corrected'); await waitFor('Corrected Computer Science'); await screenshot('management');

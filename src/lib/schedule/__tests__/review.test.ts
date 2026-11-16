@@ -59,9 +59,9 @@ describe('review corrections', () => {
   });
   test('imports validate UTF-8 byte limits rather than character count', () => {
     expect(utf8Bytes('Aé😀')).toEqual(new Uint8Array([65,195,169,240,159,152,128]));
-    expect(() => parseScheduleSource('é'.repeat(1048577),'csv','UTC','2026-12-01')).toThrow('2 MiB');
-    expect(() => parseScheduleSource('a\0b','csv','UTC','2026-12-01')).toThrow('UTF-8');
-    expect(() => parseScheduleSource('text','pdf','UTC','2026-12-01')).toThrow('ICS and CSV');
+    expect(() => parseScheduleSource('é'.repeat(1048577),'ics','UTC','2026-12-01')).toThrow('2 MiB');
+    expect(() => parseScheduleSource('a\0b','ics','UTC','2026-12-01')).toThrow('UTF-8');
+    expect(() => parseScheduleSource('text','pdf','UTC','2026-12-01')).toThrow('Only ICS');
   });
 });
 

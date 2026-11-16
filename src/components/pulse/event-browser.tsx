@@ -16,6 +16,7 @@ import { EventDiscussion, VoteButtons } from './community';
 import { summaries, type Engagement } from '@/lib/community';
 import { ProfileLink, ProfileMessage } from './profile/controls';
 import { SaveEventButton } from './save-event-button';
+import { DeleteEventButton } from './delete-event-button';
 
 function EventDate({ value }: { value: string }) {
   const [year, month, day] = value.split('-').map(Number);
@@ -84,7 +85,7 @@ export function EventFiltersScreen() {
   }
   return <Screen header={<TitleHeader title="Filter & sort" close right={<TextButton label="Reset" onPress={() => { setDraft({ ...defaultEventFilters }); setError(null); }} />} />} action="Show Results" onAction={apply}>
     <View style={{ padding: 16, gap: 32 }}>
-      <FilterGroup title="Sort" options={['date', 'top'] as const} value={draft.sort ?? 'date'} onChange={sort => update({ sort })} />
+      <FilterGroup title="Sort" options={['date', 'top'] as const} value={draft.sort ?? 'top'} onChange={sort => update({ sort })} />
       <CategoryFilterGroup selected={draft.categories} onToggle={category => update({ categories: category === null ? [] : draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category] })} />
       <FilterGroup title="Date" options={dateOptions} value={draft.date} onChange={date => update({ date })} />
       {draft.date === 'Pick Date' && <View style={{ gap: 8 }}><PulseText size={14}>Date (YYYY-MM-DD)</PulseText><TextInput accessibilityLabel="Event date, YYYY-MM-DD" value={draft.customDate} onChangeText={customDate => update({ customDate })} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} maxLength={10} autoCorrect={false} style={{ minHeight: 48, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: C.muted, color: C.white, fontSize: 16 }} /></View>}
@@ -132,6 +133,7 @@ export function SupabaseEventScreen({ id }: { id: string }) {
       {event.club_id && <ProfileLink href={{ pathname: '/clubs', params: { id: event.club_id } }} label="View hosting club" />}
       {allowed && <PreviewLink href={{ pathname: '/edit-event', params: { id: event.id } }} label="Edit event" style={{ minHeight: 48, justifyContent: 'center' }}><PulseText color={C.pink}>Edit event</PulseText></PreviewLink>}
       {allowed && event.club_id && <TextButton label="Cancel club event" onPress={() => { void communityRpc('cancel_club_event', { p_event: event.id }).then(() => setRevision(v => v + 1)).catch(() => setResult({ key, event, error: 'Unable to cancel club event. Refresh and try again.' })); }} />}
+      {(event.club_id ? allowed : !!session && event.created_by === session.user.id) && <DeleteEventButton key={`delete:${session?.user.id}:${event.id}:${event.pulse_revision}`} event={event} />}
       <EventActions key={String(event.id)} event={event} />
       <EventDiscussion key={`discussion:${session?.user.id}:${event.id}:${revision}`} eventId={event.id} />
     </>}
