@@ -10,7 +10,7 @@ export async function pickScheduleFile(): Promise<PickedScheduleFile | null> {
   const file = new File(asset.uri);
   try {
     if ((asset.size ?? file.size) > MAX_FILE_BYTES) throw new Error('File exceeds 2 MiB.');
-    if (!/\.(ics|csv)$/i.test(asset.name)) throw new Error('Select an .ics or .csv file.');
+    if (!/\.ics$/i.test(asset.name)) throw new Error('Select an .ics calendar file.');
     return { name: asset.name, bytes: await file.bytes() };
   } finally { if (file.exists) file.delete(); }
 }

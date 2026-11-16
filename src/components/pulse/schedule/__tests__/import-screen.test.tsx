@@ -1,9 +1,11 @@
 import { beforeEach, expect, jest, test } from '@jest/globals';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import ImportScreen from '../import-screen';
-import { CSV_HEADER, parseCSV } from '@/lib/schedule/import/csv';
+import { parseICS } from '@/lib/schedule/import/ics';
 import type { PickedScheduleFile } from '@/lib/schedule/import/source';
 import type { ImportResult, ScheduleSource } from '@/lib/schedule/types';
+
+const ics = (start = '090000') => `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:cs@test\r\nSUMMARY:CS\r\nDTSTART:20261026T${start}Z\r\nDTEND:20261026T100000Z\r\nEND:VEVENT\r\nEND:VCALENDAR`;
 
 const mockPick = jest.fn<() => Promise<{ name: string; text: string } | null>>();
 const mockCommit = jest.fn<() => Promise<void>>();
@@ -38,13 +40,13 @@ jest.mock('../../event-date-time-input', () => {
 beforeEach(() => {
   mockPick.mockReset(); mockCommit.mockReset(); mockReplace.mockReset(); mockPrepare.mockReset();
   mockDiscard.mockReset().mockResolvedValue(undefined); mockRemove.mockReset().mockResolvedValue(undefined);
-  mockPrepare.mockImplementation(async (_client, file, zone, end) => ({ source: { id: 'source-1', object_path: 'alice/source-1.csv', label: file.name, format: 'csv' }, result: parseCSV(file.text!, zone, end) }));
+  mockPrepare.mockImplementation(async (_client, file, zone, end) => ({ source: { id: 'source-1', object_path: 'alice/source-1.ics', label: file.name, format: 'ics' }, result: parseICS(file.text!, zone, end) }));
 });
 test('preview never saves automatically and retries an uncertain commit with the same key', async () => {
-  mockPick.mockResolvedValue({ name: 'fall.csv', text: `${CSV_HEADER}\nCS,class,Library,MO,09:00,10:00,2026-10-26,2026-12-01,UTC` });
+  mockPick.mockResolvedValue({ name: 'fall.ics', text: ics() });
   mockCommit.mockRejectedValueOnce(new Error('Connection interrupted')).mockResolvedValueOnce(undefined);
   const screen = await render(<ImportScreen />);
-  await fireEvent.press(screen.getByLabelText('Choose ICS or CSV file'));
+  await fireEvent.press(screen.getByLabelText('Choose ICS file'));
   await waitFor(() => expect(screen.getByText('CS')).toBeTruthy());
   expect(mockCommit).not.toHaveBeenCalled();
   expect(screen.getByLabelText('Save 1 selected entries')).toBeDisabled();
@@ -57,19 +59,19 @@ test('preview never saves automatically and retries an uncertain commit with the
   expect(mockCommit.mock.calls[1]).toEqual(first);
 });
 test('invalid rows are visibly excluded from saving', async () => {
-  mockPick.mockResolvedValue({ name: 'bad.csv', text: `${CSV_HEADER}\nCS,class,,MO,25:00,10:00,2026-10-26,2026-12-01,UTC` });
+  mockPick.mockResolvedValue({ name: 'bad.ics', text: ics('110000') });
   const screen = await render(<ImportScreen />);
-  await fireEvent.press(screen.getByLabelText('Choose ICS or CSV file'));
+  await fireEvent.press(screen.getByLabelText('Choose ICS file'));
   await waitFor(() => expect(screen.getByLabelText('Invalid — skipped')).toBeTruthy());
   expect(screen.getByLabelText('Save 0 selected entries')).toBeDisabled();
   expect(mockCommit).not.toHaveBeenCalled();
 });
 
 test('invalid times can be corrected before saving and confirmation resets after changes', async () => {
-  mockPick.mockResolvedValue({ name: 'bad.csv', text: `${CSV_HEADER}\nCS,class,,MO,25:00,10:00,2026-10-26,2026-12-01,UTC` });
+  mockPick.mockResolvedValue({ name: 'bad.ics', text: ics('110000') });
   mockCommit.mockResolvedValue(undefined);
   const screen = await render(<ImportScreen />);
-  await fireEvent.press(screen.getByLabelText('Choose ICS or CSV file'));
+  await fireEvent.press(screen.getByLabelText('Choose ICS file'));
   await waitFor(() => expect(screen.getByLabelText('Correct entry: CS')).toBeTruthy());
   await fireEvent.press(screen.getByLabelText('Correct entry: CS'));
   await fireEvent.changeText(screen.getByLabelText('Start time'), '09:00');
@@ -87,10 +89,10 @@ test('invalid times can be corrected before saving and confirmation resets after
 });
 
 test('cleanup failure never turns a confirmed import into a failed save', async () => {
-  mockPick.mockResolvedValue({ name: 'fall.csv', text: `${CSV_HEADER}\nCS,class,,MO,09:00,10:00,2026-10-26,2026-12-01,UTC` });
+  mockPick.mockResolvedValue({ name: 'fall.ics', text: ics() });
   mockCommit.mockResolvedValue(undefined); mockRemove.mockRejectedValue(new Error('Storage unavailable'));
   const screen = await render(<ImportScreen />);
-  await fireEvent.press(screen.getByLabelText('Choose ICS or CSV file'));
+  await fireEvent.press(screen.getByLabelText('Choose ICS file'));
   await waitFor(() => expect(screen.getByText('CS')).toBeTruthy());
   await fireEvent.press(screen.getByLabelText('Confirm timezone, selections and updates'));
   await fireEvent.press(screen.getByLabelText('Save 1 selected entries'));
@@ -99,12 +101,12 @@ test('cleanup failure never turns a confirmed import into a failed save', async 
 });
 
 test('discard removes the private source and permits a fresh file', async () => {
-  mockPick.mockResolvedValue({ name: 'fall.csv', text: `${CSV_HEADER}\nCS,class,,MO,09:00,10:00,2026-10-26,2026-12-01,UTC` });
+  mockPick.mockResolvedValue({ name: 'fall.ics', text: ics() });
   const screen = await render(<ImportScreen />);
-  await fireEvent.press(screen.getByLabelText('Choose ICS or CSV file'));
+  await fireEvent.press(screen.getByLabelText('Choose ICS file'));
   await waitFor(() => expect(screen.getByText('CS')).toBeTruthy());
   await fireEvent.press(screen.getByLabelText('Discard preview'));
-  await waitFor(() => expect(screen.getByLabelText('Choose ICS or CSV file')).toBeEnabled());
+  await waitFor(() => expect(screen.getByLabelText('Choose ICS file')).toBeEnabled());
   expect(mockDiscard).toHaveBeenCalledTimes(1);
   expect(mockCommit).not.toHaveBeenCalled();
 });

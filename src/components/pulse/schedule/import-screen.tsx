@@ -85,12 +85,12 @@ function ImportForm({ timezone }: { timezone: string }) {
   }
   return <View style={{ gap: 16 }}>
     <PulseText size={20}>Bring your timetable into Pulse</PulseText>
-    <Message text="Choose an ICS calendar or CSV schedule, then review before saving." />
+    <Message text="Choose an ICS calendar, then review before saving." />
     <EventDateTimeInput label="Semester end" mode="date" value={`${termEnd}T00:00:00`} timezone="UTC" disabled={busy || !!preview} onChange={value => setTermEnd(value.slice(0, 10))} />
     <Disclosure label="Timezone options" summary={`Times without a timezone use ${zone.replace(/_/g, ' ')}`}>
       <Field label="Timezone for floating times" value={zone} onChange={setZone} editable={!busy && !preview} />
     </Disclosure>
-    <Button label={busy ? 'Working…' : 'Choose ICS or CSV file'} onPress={() => void pick()} disabled={busy || !!preview} />
+    <Button label={busy ? 'Working…' : 'Choose ICS file'} onPress={() => void pick()} disabled={busy || !!preview} />
     <Message text={error} error />
     {preview && <>
       <PulseText size={22}>{preview.source.label}</PulseText>
@@ -123,9 +123,9 @@ function ImportForm({ timezone }: { timezone: string }) {
       <Button label={`Save ${selected.length} selected entries`} disabled={busy || !reviewed || !selected.length} onPress={() => void save()} />
       <Button label="Discard preview" disabled={busy} onPress={() => void discard()} />
     </>}
-    <Disclosure label="File formats & upload details">
-    <Message text="ICS and CSV files up to 2 MiB and 2,000 records are supported. Images and PDFs are not supported. Files are uploaded privately for validation and deleted after saving or discarding; abandoned uploads expire after 24 hours." />
-    <Message text="CSV columns: title,kind,location,days,start_time,end_time,start_date,end_date,timezone. Required: title,start_time,end_time,start_date. Defaults: class, empty location, confirmed timezone, and chosen semester end for weekly entries. Use MO|WE|FR, HH:mm and YYYY-MM-DD. Leave days blank for a one-off entry. Unsupported ICS recurrence is reported rather than approximated." />
+    <Disclosure label="ICS files & upload details">
+    <Message text="ICS calendar files up to 2 MiB and 2,000 records are supported. Images and PDFs are not supported. Files are uploaded privately for validation and deleted after saving or discarding; abandoned uploads expire after 24 hours." />
+    <Message text="Unsupported ICS recurrence is reported rather than approximated. Older ongoing weekly events are limited to the one-year window ending on the chosen semester end; review any date adjustments before saving." />
     </Disclosure>
   </View>;
 }

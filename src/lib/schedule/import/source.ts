@@ -5,8 +5,8 @@ import { utf8Bytes } from './utf8';
 export type PickedScheduleFile = { name: string; text?: string; bytes?: Uint8Array<ArrayBuffer> };
 
 export async function prepareScheduleSource(client: SupabaseClient, file: PickedScheduleFile, timezone: string, termEnd: string): Promise<{ source: ScheduleSource; result: ImportResult }> {
-  const format = /\.ics$/i.test(file.name) ? 'ics' : /\.csv$/i.test(file.name) ? 'csv' : null;
-  if (!format) throw new Error('Select an .ics or .csv file. Image and PDF imports are not supported yet.');
+  const format = /\.ics$/i.test(file.name) ? 'ics' : null;
+  if (!format) throw new Error('Select an .ics calendar file.');
   const bytes = file.bytes ?? utf8Bytes(file.text ?? '');
   if (!bytes.byteLength || bytes.byteLength > MAX_FILE_BYTES) throw new Error('Choose a nonempty file up to 2 MiB.');
   const { data, error } = await client.rpc('create_schedule_source', { p_label: file.name.slice(0, 200), p_format: format });
@@ -14,7 +14,7 @@ export async function prepareScheduleSource(client: SupabaseClient, file: Picked
   const source = data as ScheduleSource;
   try {
     const body = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    const upload = await client.storage.from('schedule-sources').upload(source.object_path, body, { contentType: format === 'ics' ? 'text/calendar' : 'text/csv', upsert: false });
+    const upload = await client.storage.from('schedule-sources').upload(source.object_path, body, { contentType: 'text/calendar', upsert: false });
     if (upload.error) throw upload.error;
     const extracted = await client.functions.invoke('schedule-source', { body: { sourceId: source.id, timezone, termEnd } });
     if (extracted.error) {

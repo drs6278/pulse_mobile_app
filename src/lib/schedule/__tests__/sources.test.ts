@@ -4,25 +4,30 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { prepareScheduleSource, discardScheduleSource } from '../import/source';
 import { cleanupScheduleSources, processScheduleSource } from '../import/process-source';
 import { utf8Bytes } from '../import/utf8';
-import { CSV_HEADER } from '../import/csv';
+const ics = (start = '090000') => `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:cs@test\r\nSUMMARY:CS\r\nDTSTART:20261026T${start}Z\r\nDTEND:20261026T100000Z\r\nEND:VEVENT\r\nEND:VCALENDAR`;
 
 beforeAll(() => { Object.defineProperty(globalThis, 'TextDecoder', { value: TextDecoder, configurable: true }); });
 const user = '00000000-0000-0000-0000-000000000001', id = '00000000-0000-0000-0000-000000000002';
-const source = { id, object_path: `${user}/${id}.csv`, label: 'fall.csv', format: 'csv' as const };
-const csv = `${CSV_HEADER}\nCS,class,,MO,09:00,10:00,2026-10-26,2026-12-01,UTC`;
+const source = { id, object_path: `${user}/${id}.ics`, label: 'fall.ics', format: 'ics' as const };
+const calendar = ics();
 const result = { candidates: [], errors: [], warnings: [] };
 
 describe('private source lifecycle', () => {
+  test('rejects CSV before creating an upload', async () => {
+    const rpc = jest.fn();
+    await expect(prepareScheduleSource({ rpc } as unknown as SupabaseClient, { name: 'fall.csv', text: 'title,start_time' }, 'UTC', '2026-12-01')).rejects.toThrow('.ics');
+    expect(rpc).not.toHaveBeenCalled();
+  });
   test('uploads original bytes, invokes the authenticated parser, and does not commit', async () => {
     const upload = jest.fn(async (..._args: unknown[]) => ({ error: null }));
     const invoke = jest.fn(async (..._args: unknown[]) => ({ data: result, error: null }));
     const rpc = jest.fn(async (..._args: unknown[]) => ({ data: source, error: null }));
     const client = { rpc, storage: { from: () => ({ upload }) }, functions: { invoke } } as unknown as SupabaseClient;
-    const encoded = utf8Bytes(csv), backing = new Uint8Array(encoded.length + 8);
+    const encoded = utf8Bytes(calendar), backing = new Uint8Array(encoded.length + 8);
     backing.set(encoded,4);
     const bytes = backing.subarray(4,4+encoded.length);
-    expect(await prepareScheduleSource(client,{ name:'fall.csv',bytes },'UTC','2026-12-01')).toEqual({ source,result });
-    expect(upload).toHaveBeenCalledWith(source.object_path,encoded.buffer,{contentType:'text/csv',upsert:false});
+    expect(await prepareScheduleSource(client,{ name:'fall.ics',bytes },'UTC','2026-12-01')).toEqual({ source,result });
+    expect(upload).toHaveBeenCalledWith(source.object_path,encoded.buffer,{contentType:'text/calendar',upsert:false});
     expect(invoke).toHaveBeenCalledWith('schedule-source',{body:{sourceId:id,timezone:'UTC',termEnd:'2026-12-01'}});
     expect(rpc).toHaveBeenCalledTimes(1);
   });
@@ -30,13 +35,13 @@ describe('private source lifecycle', () => {
     const calls: string[] = [];
     const rpc = jest.fn(async (name: string) => { calls.push(name); return { data: source, error: null }; });
     const remove = jest.fn(async (..._args: unknown[]) => { calls.push('remove'); return { error: null }; });
-    const client = { rpc, storage: { from: () => ({ upload: async () => ({ error:null }), remove }) }, functions: { invoke: async () => ({ error: { context: { json: async () => ({error:'Unsupported CSV columns: unexpected.'}) } } }) } } as unknown as SupabaseClient;
-    await expect(prepareScheduleSource(client,{name:'fall.csv',text:csv},'UTC','2026-12-01')).rejects.toThrow('Unsupported CSV columns');
+    const client = { rpc, storage: { from: () => ({ upload: async () => ({ error:null }), remove }) }, functions: { invoke: async () => ({ error: { context: { json: async () => ({error:'Invalid ICS calendar: unexpected.'}) } } }) } } as unknown as SupabaseClient;
+    await expect(prepareScheduleSource(client,{name:'fall.ics',text:calendar},'UTC','2026-12-01')).rejects.toThrow('Invalid ICS calendar');
     expect(calls).toEqual(['create_schedule_source','discard_schedule_source','remove','finish_schedule_source_cleanup']);
   });
   test('rejects oversized files before creating a private upload', async () => {
     const rpc = jest.fn();
-    await expect(prepareScheduleSource({rpc} as unknown as SupabaseClient,{name:'fall.csv',bytes:new Uint8Array(2097153)},'UTC','2026-12-01')).rejects.toThrow('2 MiB');
+    await expect(prepareScheduleSource({rpc} as unknown as SupabaseClient,{name:'fall.ics',bytes:new Uint8Array(2097153)},'UTC','2026-12-01')).rejects.toThrow('2 MiB');
     expect(rpc).not.toHaveBeenCalled();
   });
   test('a discard cannot delete bytes if recording cleanup fails', async () => {
@@ -48,12 +53,12 @@ describe('private source lifecycle', () => {
 });
 
 function processor(options: { type?: string; bytes?: Uint8Array<ArrayBuffer>; expired?: boolean; missing?: boolean } = {}) {
-  const bytes = options.bytes ?? utf8Bytes(csv);
+  const bytes = options.bytes ?? utf8Bytes(calendar);
   const rpc = jest.fn(async (..._args: unknown[]) => ({error:null}));
   const eq = jest.fn();
   const query = { eq, single: async () => ({data:options.missing ? null : {...source,user_id:user,created_at:new Date(Date.now()-(options.expired ? 90000000 : 0)).toISOString(),cleanup_requested:false},error:null}) };
   eq.mockReturnValue(query);
-  const download = jest.fn(async(..._args: unknown[])=>({data:{size:bytes.byteLength,type:options.type ?? 'text/csv',arrayBuffer:async()=>bytes.buffer},error:null}));
+  const download = jest.fn(async(..._args: unknown[])=>({data:{size:bytes.byteLength,type:options.type ?? 'text/calendar',arrayBuffer:async()=>bytes.buffer},error:null}));
   const client = { rpc, from:()=>({select:()=>query}), storage:{from:()=>({download})} } as unknown as SupabaseClient;
   return {client,rpc,download,eq};
 }

@@ -7,7 +7,7 @@ export type EventFilters = {
   customDate: string;
 };
 export const defaultEventFilters: EventFilters = {
-  categories: [], date: 'Upcoming', customDate: '',
+  sort: 'top', categories: [], date: 'Upcoming', customDate: '',
 };
 
 export function parseEventDate(value: string): Date | null {

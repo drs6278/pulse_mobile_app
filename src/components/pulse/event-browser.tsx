@@ -74,7 +74,7 @@ export function EventFiltersScreen() {
   }
   return <Screen header={<TitleHeader title="Filter & sort" close right={<TextButton label="Reset" onPress={() => { setDraft({ ...defaultEventFilters }); setError(null); }} />} />} action="Show Results" onAction={apply}>
     <View style={{ padding: 16, gap: 32 }}>
-      <FilterGroup title="Sort" options={['date', 'top'] as const} value={draft.sort ?? 'date'} onChange={sort => update({ sort })} />
+      <FilterGroup title="Sort" options={['date', 'top'] as const} value={draft.sort ?? 'top'} onChange={sort => update({ sort })} />
       <CategoryFilterGroup selected={draft.categories} onToggle={category => update({ categories: category === null ? [] : draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category] })} />
       <FilterGroup title="Date" options={dateOptions} value={draft.date} onChange={date => update({ date })} />
       {draft.date === 'Pick Date' && <View style={{ gap: 8 }}><PulseText size={14}>Date (YYYY-MM-DD)</PulseText><TextInput accessibilityLabel="Event date, YYYY-MM-DD" value={draft.customDate} onChangeText={customDate => update({ customDate })} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} maxLength={10} autoCorrect={false} style={{ minHeight: 48, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: C.muted, color: C.white, fontSize: 16 }} /></View>}

@@ -3,8 +3,9 @@ import { DateTime } from 'luxon';
 import { localDate, toLocal, validZone, wallTime } from '../time';
 import { MAX_FILE_BYTES, MAX_RECORDS, type ImportCandidate, type ImportResult, type ScheduleDraft } from '../types';
 import { validateSchedule } from '../validation';
-import { weekdays } from './csv';
 import { utf8Bytes } from './utf8';
+
+const weekdays = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 
 type Time = InstanceType<typeof ICAL.Time>;
 type Component = InstanceType<typeof ICAL.Component>;
@@ -85,6 +86,24 @@ export function parseICS(text: string, timezone: string, termEnd: string): Impor
         exceptions.push({ recurrence_key: key, cancelled, start_local: cancelled ? null : local(movedStart!), end_local: cancelled ? null : local(movedEnd!) });
       }
       if (String(component.getFirstPropertyValue('status')).toUpperCase() === 'CANCELLED') throw new Error('Canceled series are not imported. Remove an existing imported series manually.');
+      // Old, unbounded calendars must fit the same one-year window as manual
+      // schedules. Jump whole recurrence cycles to preserve the weekly phase.
+      if (recurrence && !recurrence.count && !recurrence.until && !draft.rdates.length && !exceptions.length) {
+        const anchor = DateTime.fromISO(draft.start_local, { zone: 'UTC' });
+        const earliest = DateTime.fromISO(termEnd, { zone: 'UTC' }).minus({ days: 366 });
+        if (anchor < earliest) {
+          const cycle = recurrence.interval * 7;
+          const cycles = Math.floor(earliest.diff(anchor, 'days').days / cycle);
+          let next = anchor.plus({ days: cycles * cycle });
+          const weekAnchor = anchor.startOf('day').minus({ days: (anchor.weekday - recurrence.weekStart + 7) % 7 });
+          while (next < earliest || !recurrence.days.includes(next.weekday) || Math.floor(next.startOf('day').diff(weekAnchor, 'days').days / 7) % recurrence.interval !== 0) next = next.plus({ days: 1 });
+          const duration = DateTime.fromISO(draft.end_local, { zone: 'UTC' }).diff(anchor).toMillis();
+          draft.start_local = toLocal(next);
+          draft.end_local = toLocal(next.plus({ milliseconds: duration }));
+          draft.exdates = draft.exdates.filter(date => date >= draft.start_local);
+          warnings.add(`${title}: ongoing recurrence starts ${draft.start_local.slice(0, 10)} in Pulse to fit the one-year import window ending ${termEnd}. Earlier occurrences are omitted.`);
+        }
+      }
       const issues = validateSchedule(draft);
       for (const exception of exceptions) {
         if (!wallTime(exception.recurrence_key, zone)) issues.push('An occurrence has an invalid original identity.');

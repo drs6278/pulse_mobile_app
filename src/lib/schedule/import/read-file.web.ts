@@ -6,13 +6,13 @@ import type { PickedScheduleFile } from './source';
 export function pickScheduleFile(): Promise<PickedScheduleFile | null> {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
-    input.type = 'file'; input.accept = '.ics,.csv,text/calendar,text/csv';
+    input.type = 'file'; input.accept = '.ics,text/calendar';
     input.oncancel = () => resolve(null);
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) { resolve(null); return; }
       if (file.size > MAX_FILE_BYTES) { reject(new Error('File exceeds 2 MiB.')); return; }
-      if (!/\.(ics|csv)$/i.test(file.name)) { reject(new Error('Select an .ics or .csv file.')); return; }
+      if (!/\.ics$/i.test(file.name)) { reject(new Error('Select an .ics calendar file.')); return; }
       void file.arrayBuffer().then(buffer => resolve({ name: file.name, bytes: new Uint8Array(buffer) }), reject);
     };
     input.click();

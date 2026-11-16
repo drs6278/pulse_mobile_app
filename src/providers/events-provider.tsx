@@ -36,7 +36,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     if (!userId) return;
     const controller = new AbortController();
     let active = true;
-    void fetchEvents(supabase, request.search, request.page, controller.signal, request.filters.sort === 'top').then(data => {
+    void fetchEvents(supabase, request.search, request.page, controller.signal, request.filters.sort !== 'date').then(data => {
       if (active) setResult({ ...data, request, userId, error: null });
     }).catch(() => {
       if (active) setResult({ request, userId, events: [], count: 0, error: 'Unable to load events. Please try again.' });

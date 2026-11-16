@@ -8,7 +8,7 @@ The source document is `cmpsi475/user_stories.docx`, D02 and sections 6/9.
 | Requirement | Implementation |
 | --- | --- |
 | Manual entry and editing | Shared editor with separate dates/times, timezone, type, weekly recurrence, and availability blocking |
-| Exported file import | Private ICS/CSV upload, authenticated backend validation, editable tentative entries, explicit confirmation |
+| Exported file import | Private ICS upload, authenticated backend validation, editable tentative entries, explicit confirmation |
 | Correct extraction mistakes | Field errors can be corrected; malformed structures and unsupported ICS rules remain rejected |
 | Recurrence and timezones | Existing bounded weekly/RDATE/EXDATE and moved/cancelled occurrence support; original occurrence identities retained |
 | Conflict detection | Nonblocking warnings against busy classes, commitments, selected imports, and going RSVPs; incomplete checks are disclosed |
@@ -32,7 +32,7 @@ Source registration/cleanup, reviewed commits, and clear-schedule use narrowly s
 
 ## Retention and failure behavior
 
-Sources are private UTF-8 ICS/CSV objects capped at 2 MiB and 2,000 records. Browser/native MIME associations vary, so the client assigns the canonical format MIME and the backend checks MIME plus parsed content. Native cache copies are deleted after reading. No university credentials or OCR provider are used.
+Sources are private UTF-8 ICS objects capped at 2 MiB and 2,000 records. Browser/native MIME associations vary, so the client assigns the canonical format MIME and the backend checks MIME plus parsed content. Native cache copies are deleted after reading. No university credentials or OCR provider are used.
 
 Unconfirmed objects expire after 24 hours and are deleted on the next scheduled run. Save/discard immediately queues source cleanup; the app attempts immediate removal, and the worker retries failures. Source metadata is removed after successful object deletion. The cleanup ledger survives schedule/account deletion, so failed deletions and abandoned sources remain available to the worker. Deleted account sources expire within the same 24-hour window.
 
@@ -51,3 +51,5 @@ For the updated 360px browser workflow, run `npx expo export --platform all --ou
 The new database tests use disposable PGlite with a minimal Storage-policy harness; they do not contact a hosted backend. Test native file providers/calendar permissions on iOS and Android development builds and run the existing web smoke workflow after an Expo export. Storage service MIME enforcement and deployed Deno execution additionally require staging validation.
 
 References: [Expo SDK 57 DocumentPicker](https://docs.expo.dev/versions/v57.0.0/sdk/document-picker/), [Supabase Storage RLS](https://supabase.com/docs/guides/storage/security/access-control), [Edge Function dependencies](https://supabase.com/docs/guides/functions/dependencies).
+
+Only `.ics` files are accepted by the picker, upload preparation, and backend processor. Old unbounded weekly events without detached overrides or RDATE additions are shifted into the one-year window ending on the selected semester end, preserving recurrence phase and wall times. The preview explicitly warns when earlier occurrences are omitted. Redeploy `schedule-source` after updating the generated parser.

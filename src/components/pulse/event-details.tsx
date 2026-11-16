@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { EventDiscussion, useVote } from './community';
 import { CommentCountPill } from './event-card';
+import { DeleteEventButton } from './delete-event-button';
 import { EventActionBar, useScheduleFit } from './schedule/event-actions';
 import { EventPhoto } from './ui/event-photo';
 import { ActionSheet, Button, IconButton, InlineMessage, PreviewLink, PulseIcon, PulseText, Screen, TitleHeader, VoteControl, type PulseIconName, type PulseTextTone } from './ui';
@@ -63,6 +64,7 @@ export function SupabaseEventScreen({ id, photoError }: { id: string; photoError
           </View>
           <EventEngagement eventId={event.id} version={`${revision}:${commentVersion}`} />
           <EventInfoCard event={event} />
+          {(event.club_id ? allowed : !!session && event.created_by === session.user.id) && <DeleteEventButton key={`delete:${session?.user.id}:${event.id}:${event.pulse_revision}`} event={event} />}
           <EventDiscussion key={`discussion:${session?.user.id}:${event.id}:${revision}`} eventId={event.id} onCommentsChanged={() => setCommentVersion(value => value + 1)} />
           {menuOpen && <ActionSheet visible title="Event options" onClose={() => setMenuOpen(false)} actions={[
             { label: 'Edit event', onPress: () => router.push({ pathname: '/edit-event', params: { id: event.id } }) },

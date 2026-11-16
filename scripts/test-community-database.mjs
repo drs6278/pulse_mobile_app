@@ -19,7 +19,7 @@ try {
  create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
  create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets(id),name text,unique(bucket_id,name));
  alter table storage.objects enable row level security; grant select,insert,delete on storage.objects to authenticated;`);
- for (const name of ['202610190001_scheduling','202610210001_event_creation','202610210003_schedule_review','202610230001_profiles','202610230002_profile_setup','202610280001_event_edit_notifications','202610280002_community']) {
+ for (const name of ['202610190001_scheduling','202610210001_event_creation','202610210003_schedule_review','202610230001_profiles','202610230002_profile_setup','202610280001_event_edit_notifications','202610280002_community','202611020001_saved_events','202611130001_event_deletion']) {
   await db.exec(await fs.readFile(new URL(`../supabase/migrations/${name}.sql`,import.meta.url),'utf8'));
  }
  await db.exec(`update public.private_profiles set profile_setup_completed_at=now(),age_band='21_plus'`);
@@ -58,7 +58,28 @@ try {
  await db.query('select public.delete_event_comment($1)',[comment]);
  assert.equal((await db.query('select * from public.list_event_comments($1)',[event])).rows[0].body,'[Comment unavailable]');
  assert.equal((await db.query('select * from public.list_event_comments($1,$2)',[event,comment])).rows[0].id,reply);
+ const retained = (await db.query('select public.create_club_event($1,$2::jsonb) id',[club,JSON.stringify(draft)])).rows[0].id;
+ await db.query('select public.delete_pulse_event($1,$2)',[event,(await db.query('select pulse_revision from public.events where id=$1',[event])).rows[0].pulse_revision]);
+ await db.exec('reset role');
+ assert.equal((await db.query('select count(*)::int n from public.event_comments where event_id=$1',[event])).rows[0].n,0,'nested discussion removed');
+ await identity(alice);
  await db.query('select public.delete_club($1)',[club]);
- assert.equal((await db.query('select pulse_cancelled from public.events where id=$1',[event])).rows[0].pulse_cancelled,true);
- console.log('PASS community database: votes, privacy, nested replies, ownership, reports, notifications, membership, last admin, club deletion');
+ assert.equal((await db.query('select pulse_cancelled from public.events where id=$1',[retained])).rows[0].pulse_cancelled,true);
+ const personal = (await db.query(`insert into public.events(title,location,category,event_date) values('Personal','Hall','Other','2099-01-01') returning id`)).rows[0].id;
+ await identity(bob);
+ await db.query('insert into public.event_rsvps values($1,$2,$3)',[bob,personal,'going']);
+ await db.exec('reset role');
+ await db.query('insert into public.saved_events(user_id,event_id) values($1,$2)',[bob,personal]);
+ await identity(bob);
+ await assert.rejects(db.query('select public.delete_pulse_event($1,1)',[personal]),/Only the organizer/);
+ await identity(alice);
+ await assert.rejects(db.query('select public.delete_pulse_event($1,99)',[personal]),/changed/);
+ await db.query('select public.delete_pulse_event($1,1)',[personal]);
+ await assert.rejects(db.query('select public.delete_pulse_event($1,1)',[personal]),/no longer available/);
+ await db.exec('reset role');
+ assert.equal((await db.query('select count(*)::int n from public.event_rsvps where event_id=$1',[personal])).rows[0].n,0);
+ assert.equal((await db.query('select count(*)::int n from public.saved_events where event_id=$1',[personal])).rows[0].n,0);
+ await db.exec('set role anon');
+ await assert.rejects(db.query('select public.delete_pulse_event($1,1)',[personal]),/permission denied/);
+ console.log('PASS community database and event deletion: organizer authorization, revisions, cascades, nested discussions and anonymous denial');
 } finally { await db.close(); }
