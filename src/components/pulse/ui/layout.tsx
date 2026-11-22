@@ -96,9 +96,10 @@ export function Screen({ children, header, activeTab, bottomBar = false, action,
     {scroll ? <ScrollView refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} /> : undefined} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" style={styles.fill} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       {children}
     </ScrollView> : <View style={styles.fill}>{children}</View>}
-    {bottomBar && <BottomBar active={activeTab} />}
     {footer ? <View style={styles.footer}>{footer}</View>
       : action && <View style={styles.footer}><Button label={action} variant="primary" onPress={onAction} href={onAction ? undefined : actionHref} disabled={!onAction && !actionHref} /></View>}
+    {/* The tab bar stays at the very bottom, under any pinned footer. */}
+    {bottomBar && <BottomBar active={activeTab} />}
     {overlay}
   </SafeAreaView></View>;
 }

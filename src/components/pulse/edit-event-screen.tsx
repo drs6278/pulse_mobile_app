@@ -13,8 +13,12 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useEvents } from '@/providers/events-provider';
 import { useRSVPs } from '@/providers/rsvp-provider';
+import type { ReactNode } from 'react';
+import { PulseSpacing } from '@/constants/pulse-theme';
 import { Screen, TitleHeader, PulseText } from './ui';
-import { EventFormFields } from './screens';
+import { Button as ActionButton } from './ui/button';
+import { InlineMessage } from './ui/feedback';
+import { EventFormFields } from './event-form';
 import { Button, Message } from './schedule/controls';
 
 export default function EditEventScreen() {
@@ -29,13 +33,18 @@ export default function EditEventScreen() {
   if (loaded && user && loaded.id === eventId && (opened?.user !== user || opened.event.id !== eventId)) {
     setOpened({ user, event: loaded });
   }
-  return <Screen header={<TitleHeader title="Edit event" />}><View style={{ padding: 16, gap: 16 }}>
-    {currentEvent ? <EditSession key={`${user}:${currentEvent.id}`} event={currentEvent} user={user ?? undefined} /> : resource.loading ? <PulseText>Loading event…</PulseText> : resource.error ? <><Message text={resource.error} error /><Button label="Try again" onPress={resource.refresh} /></> : <PulseText>This event is unavailable for editing. Only the original poster can edit it before it starts.</PulseText>}
-  </View></Screen>;
+  if (currentEvent) return <EditSession key={`${user}:${currentEvent.id}`} event={currentEvent} user={user ?? undefined} />;
+  return <EditFrame>
+    {resource.loading ? <PulseText>Loading event…</PulseText> : resource.error ? <><Message text={resource.error} error /><Button label="Try again" onPress={resource.refresh} /></> : <PulseText>This event is unavailable for editing. Only the original poster can edit it before it starts.</PulseText>}
+  </EditFrame>;
+}
+// Same page frame as Create event; the editor adds its sticky Save bar as the footer.
+function EditFrame({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
+  return <Screen header={<TitleHeader title="Edit event" />} footer={footer}><View style={{ padding: PulseSpacing.lg, gap: PulseSpacing.lg }}>{children}</View></Screen>;
 }
 function EditSession({ event, user }: { event: PulseEvent; user?: string }) {
   const eligible = useEventPermission(event, user);
-  return eligible ? <Editor event={event} /> : <PulseText>This event is unavailable for editing. Only the original poster can edit it before it starts.</PulseText>;
+  return eligible ? <Editor event={event} /> : <EditFrame><PulseText>This event is unavailable for editing. Only the original poster can edit it before it starts.</PulseText></EditFrame>;
 }
 function Editor({ event }: { event: PulseEvent }) {
   const { session } = useAuth();
@@ -95,12 +104,14 @@ function Editor({ event }: { event: PulseEvent }) {
       events.refresh(); rsvps.refresh(); setSaved(true);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save event.'); setBusy(false); }
   }
-  return <>
+  const footer = <View style={{ gap: PulseSpacing.sm }}>
+    <InlineMessage text={error} error />
+    <ActionButton label="Save changes" variant="primary" loading={busy} disabled={!allowed || !dirty} onPress={() => void save()} />
+  </View>;
+  return <EditFrame footer={footer}>
     {!allowed && <Message text="Only the original poster can edit an event, and only before it starts." error />}
     {allowed && <EventPhotoField uri={pendingPhoto ?? undefined} path={photoPath} busy={photoBusy} error={photoError} onChoose={() => void changePhoto('pick')} onRemove={() => void changePhoto('remove')} />}
     <EventFormFields draft={draft} busy={busy || !allowed} change={values => { setDraft(previous => ({ ...previous, ...values })); setError(null); }} />
-    <PulseText size={14}>Saving updates the event immediately and notifies Going attendees. Existing RSVPs are kept.</PulseText>
-    <Message text={error} error />
-    <Button label={busy ? 'Saving…' : 'Save changes'} disabled={busy || !allowed || !dirty} onPress={() => void save()} />
-  </>;
+    <PulseText variant="caption" tone="muted">Saving updates the event immediately and notifies Going attendees. Existing RSVPs are kept.</PulseText>
+  </EditFrame>;
 }

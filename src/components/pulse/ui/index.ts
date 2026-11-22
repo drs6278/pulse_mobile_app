@@ -4,6 +4,7 @@ export * from './button';
 export * from './chip-group';
 export * from './feedback';
 export * from './icon';
+export * from './info-card';
 export * from './layout';
 export * from './scale';
 export * from './segmented-control';

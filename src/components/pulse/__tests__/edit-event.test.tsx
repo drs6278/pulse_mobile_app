@@ -20,9 +20,9 @@ jest.mock('@/lib/profile/repository', () => ({ profileSessionClient: () => ({}) 
 jest.mock('@/lib/event-edit', () => ({ ...jest.requireActual<typeof import('@/lib/event-edit')>('@/lib/event-edit'), updateEvent: (...args: unknown[]) => mockUpdate(...args) }));
 jest.mock('../ui', () => {
   const { Text, View } = jest.requireActual<typeof import('react-native')>('react-native');
-  return { Screen: ({ children }: { children: React.ReactNode }) => <View>{children}</View>, TitleHeader: () => null, PulseText: ({ children }: { children: React.ReactNode }) => <Text>{children}</Text> };
+  return { Screen: ({ children, footer }: { children: React.ReactNode; footer?: React.ReactNode }) => <View>{children}{footer}</View>, TitleHeader: () => null, PulseText: ({ children }: { children: React.ReactNode }) => <Text>{children}</Text> };
 });
-jest.mock('../screens', () => {
+jest.mock('../event-form', () => {
   const { TextInput } = jest.requireActual<typeof import('react-native')>('react-native');
   return { EventFormFields: ({ draft, change, busy }: { draft: { title: string }; change: (values: object) => void; busy: boolean }) => <TextInput accessibilityLabel="Title" value={draft.title} onChangeText={(title: string) => change({ title })} editable={!busy} /> };
 });

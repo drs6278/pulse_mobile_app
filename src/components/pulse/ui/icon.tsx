@@ -24,6 +24,7 @@ const symbols = {
   trash: ['trash', 'delete'],
   date: ['calendar', 'calendar_today'],
   filter: ['line.3.horizontal.decrease', 'filter_list'],
+  globe: ['globe', 'public'],
   home: ['house', 'home'],
   info: ['info.circle', 'info'],
   map: ['map', 'map'],

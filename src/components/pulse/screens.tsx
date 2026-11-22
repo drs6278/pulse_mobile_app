@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { PulseColors as C, PulseImages as Images } from '@/constants/pulse-theme';
+import { PulseColors as C, PulseImages as Images, PulseSpacing } from '@/constants/pulse-theme';
 import { createEvent, defaultEventDraft, type EventDraft } from '@/lib/event-create';
 import { eventCategories } from '@/lib/event-filters';
 import { pickEventPhoto, uploadEventPhoto, type PickedEventPhoto } from '@/lib/event-photo';
@@ -12,13 +12,12 @@ import { profileSessionClient } from '@/lib/profile/repository';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { useEvents } from '@/providers/events-provider';
-import { EventFeed, EventFiltersScreen, FilterGroup } from './event-browser';
+import { EventFeed, EventFiltersScreen } from './event-browser';
 import { SupabaseEventScreen } from './event-details';
-import { EventDateTimeFields } from './event-date-time-fields';
+import { EventFormFields } from './event-form';
 import { EventPhotoField } from './event-photo-field';
-import { Button, Field, Message } from './schedule/controls';
 import {
-  HeaderActions, Photo, PreviewLink, PulseIcon, PulseText, Screen,
+  Button, HeaderActions, InlineMessage, Photo, PreviewLink, PulseIcon, PulseText, Screen,
   SearchHeader, Tag, TitleHeader, usePulseScale,
 } from './ui';
 
@@ -84,11 +83,6 @@ function EventContent() {
 }
 
 export function CreateScreen() {
-  return <Screen header={<TitleHeader title="Create event" back={false} right={<HeaderActions />} />} bottomBar activeTab="create"><CreateContent /></Screen>;
-}
-
-function CreateContent() {
-  const s = usePulseScale();
   const { refresh } = useEvents();
   const { session } = useAuth();
   const [draft, setDraft] = useState(() => defaultEventDraft());
@@ -115,23 +109,16 @@ function CreateContent() {
     setDraft(defaultEventDraft()); setPhoto(null); setBusy(false);
     router.replace({ pathname: '/event', params: photoError ? { id, photoError } : { id } });
   }
-  return <View style={{ padding: 16 * s, gap: 16 }}>
-    <EventPhotoField uri={photo?.uri} busy={busy} onChoose={() => void choosePhoto()} onRemove={() => setPhoto(null)} />
-    <EventFormFields draft={draft} busy={busy} change={change} />
-    <Message text={error} error />
-    <Button label={busy ? 'Posting…' : 'Post event'} onPress={() => void post()} disabled={busy} />
+  const footer = <View style={{ gap: PulseSpacing.sm }}>
+    <InlineMessage text={error} error />
+    <Button label="Post event" variant="primary" loading={busy} onPress={() => void post()} />
   </View>;
-}
-
-export function EventFormFields({ draft, busy, change }: { draft: EventDraft; busy: boolean; change: (values: Partial<EventDraft>) => void }) {
-  return <>
-    <Field label="Title" value={draft.title} onChange={title => change({ title })} editable={!busy} placeholder="Pick up basketball" />
-    <Field label="Location" value={draft.location} onChange={location => change({ location })} editable={!busy} placeholder="Junker main gym" />
-    <FilterGroup title="Category" options={eventCategories} value={draft.category} onChange={category => { if (!busy) change({ category }); }} />
-    <Field label="Timezone" value={draft.timezone} onChange={timezone => change({ timezone })} editable={!busy} placeholder="America/New_York" />
-    <EventDateTimeFields draft={draft} disabled={busy} onChange={change} />
-    <View style={{ gap: 12 }}><PulseText size={18}>Age eligibility</PulseText><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>{([0, 18, 21] as const).map(age => <Pressable key={age} accessibilityRole="radio" accessibilityLabel={age ? `${age} and older` : 'All ages'} accessibilityState={{ checked: (draft.age_min ?? 0) === age, disabled: busy }} disabled={busy} onPress={() => change({ age_min: age })} style={{ minWidth: 70, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: (draft.age_min ?? 0) === age ? C.pink : C.muted, padding: 12, justifyContent: 'center', alignItems: 'center' }}><PulseText size={14}>{age ? `${age}+` : 'All ages'}</PulseText></Pressable>)}</View><PulseText size={14}>Age eligibility is self-reported, not verified identification.</PulseText></View>
-  </>;
+  return <Screen header={<TitleHeader title="Create event" back={false} right={<HeaderActions />} />} footer={footer} bottomBar activeTab="create">
+    <View style={{ padding: PulseSpacing.lg, gap: PulseSpacing.lg }}>
+      <EventPhotoField uri={photo?.uri} busy={busy} onChoose={() => void choosePhoto()} onRemove={() => setPhoto(null)} />
+      <EventFormFields draft={draft} busy={busy} change={change} />
+    </View>
+  </Screen>;
 }
 
 export function MapScreen() {

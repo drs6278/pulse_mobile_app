@@ -1,4 +1,4 @@
-import { router, useFocusEffect, type Href } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
@@ -14,7 +14,7 @@ import { CommentCountPill } from './event-card';
 import { DeleteEventButton } from './delete-event-button';
 import { EventActionBar, useScheduleFit } from './schedule/event-actions';
 import { EventPhoto } from './ui/event-photo';
-import { ActionSheet, Button, IconButton, InlineMessage, PreviewLink, PulseIcon, PulseText, Screen, TitleHeader, VoteControl, type PulseIconName, type PulseTextTone } from './ui';
+import { ActionSheet, Button, IconButton, InfoCard, InfoRow, InlineMessage, PulseText, Screen, TitleHeader, VoteControl, type PulseTextTone } from './ui';
 
 export function SupabaseEventScreen({ id, photoError }: { id: string; photoError?: string }) {
   const { session } = useAuth();
@@ -104,34 +104,11 @@ function EventInfoCard({ event }: { event: PulseEvent }) {
   const when = eventWhen(event);
   const fit = useScheduleFit(event);
   const fitLine = fit && !event.pulse_cancelled ? fitDetail[fit] : null;
-  return <View style={{ padding: PulseSpacing.md, gap: PulseSpacing.xs, borderRadius: PulseRadius.lg, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface }}>
+  return <InfoCard>
     <InfoRow icon="date" title={when.date} detail={when.time} extra={fitLine} />
     <InfoRow icon="pin" title={event.location} />
     {event.club_id && <InfoRow icon="people" title="Hosting club" href={{ pathname: '/clubs', params: { id: event.club_id } }} />}
     {event.created_by && <InfoRow icon="account" title="Organizer profile" href={{ pathname: '/student-profile', params: { id: event.created_by } }} />}
     {!!event.pulse_age_min && <InfoRow icon="info" title={`${event.pulse_age_min}+`} detail="Self-reported age eligibility required" />}
-  </View>;
-}
-
-function InfoRow({ icon, title, detail, extra, href }: {
-  icon: PulseIconName;
-  title: string;
-  detail?: string | null;
-  extra?: { text: string; tone: PulseTextTone } | null;
-  href?: Href;
-}) {
-  const content = <>
-    <View style={{ width: 36, height: 36, borderRadius: PulseRadius.md, backgroundColor: C.surfaceRaised, alignItems: 'center', justifyContent: 'center' }}>
-      <PulseIcon name={icon} size={18} color={C.accent} />
-    </View>
-    <View style={{ flex: 1 }}>
-      <PulseText variant="body">{title}</PulseText>
-      {!!detail && <PulseText variant="label" tone="muted">{detail}</PulseText>}
-      {extra && <PulseText variant="label" tone={extra.tone}>{extra.text}</PulseText>}
-    </View>
-    {href && <PulseIcon name="next" size={18} />}
-  </>;
-  const style = { minHeight: 48, paddingVertical: PulseSpacing.xs, flexDirection: 'row', alignItems: 'center', gap: PulseSpacing.md } as const;
-  if (href) return <PreviewLink href={href} label={title} style={style}>{content}</PreviewLink>;
-  return <View style={style}>{content}</View>;
+  </InfoCard>;
 }

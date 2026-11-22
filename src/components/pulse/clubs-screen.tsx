@@ -6,7 +6,7 @@ import { communityRpc, emptyClub, summaries, type Club, type ClubDraft, type Eng
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { defaultEventDraft, eventRow, validateEventDraft } from '@/lib/event-create';
-import { EventFormFields } from './screens';
+import { EventFormFields } from './event-form';
 import { Screen, TitleHeader } from './ui';
 import { ProfileButton, ProfileField, ProfileLink, ProfileMessage, ProfileText } from './profile/controls';
 import { VoteButtons } from './community';
