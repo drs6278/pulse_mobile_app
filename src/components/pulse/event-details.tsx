@@ -29,6 +29,7 @@ export function SupabaseEventScreen({ id, photoError }: { id: string; photoError
   const loading = !current;
   const event = current?.event;
   const allowed = useEventPermission(event, session?.user.id);
+  const canDelete = useEventPermission(event, session?.user.id, 'delete');
   const error = current?.error;
   useEffect(() => {
     const controller = new AbortController();
@@ -64,7 +65,7 @@ export function SupabaseEventScreen({ id, photoError }: { id: string; photoError
           </View>
           <EventEngagement eventId={event.id} version={`${revision}:${commentVersion}`} />
           <EventInfoCard event={event} />
-          {(event.club_id ? allowed : !!session && event.created_by === session.user.id) && <DeleteEventButton key={`delete:${session?.user.id}:${event.id}:${event.pulse_revision}`} event={event} />}
+          {canDelete && <DeleteEventButton key={`delete:${session?.user.id}:${event.id}:${event.pulse_revision}`} event={event} />}
           <EventDiscussion key={`discussion:${session?.user.id}:${event.id}:${revision}`} eventId={event.id} onCommentsChanged={() => setCommentVersion(value => value + 1)} />
           {menuOpen && <ActionSheet visible title="Event options" onClose={() => setMenuOpen(false)} actions={[
             { label: 'Edit event', onPress: () => router.push({ pathname: '/edit-event', params: { id: event.id } }) },

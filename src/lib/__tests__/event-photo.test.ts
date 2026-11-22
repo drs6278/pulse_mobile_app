@@ -119,11 +119,13 @@ describe('event queries before the photo migration', () => {
 
   test('details fall back step by step, and only read-only screens accept basic columns', async () => {
     const missing = { error: { code: '42703' } };
-    const readOnly = eventsClient([missing, missing, { data: { id: '1' } }]);
+    const readOnly = eventsClient([missing, missing, missing, { data: { id: '1' } }]);
     await expect(fetchEventById(readOnly.client, '1', signal, { allowBasic: true })).resolves.toEqual({ id: '1' });
-    expect(readOnly.selected).toHaveLength(3);
-    const editor = eventsClient([missing, missing]);
+    expect(readOnly.selected).toHaveLength(4);
+    expect(readOnly.selected[0]).toContain('pulse_visibility');
+    expect(readOnly.selected[1]).not.toContain('pulse_visibility');
+    const editor = eventsClient([missing, missing, missing]);
     await expect(fetchEventById(editor.client, '1', signal)).rejects.toEqual({ code: '42703' });
-    expect(editor.selected).toHaveLength(2);
+    expect(editor.selected).toHaveLength(3);
   });
 });
