@@ -9,15 +9,11 @@ import type { ScheduleSeries } from '../types';
 
 const base: PulseEvent = { id: '1', title: 'Music', event_date: '2026-10-26', location: 'Hall', category: 'Music', pulse_starts_at: '2026-10-26T14:00Z', pulse_ends_at: '2026-10-26T15:00Z' };
 describe('integration contracts', () => {
-  test('canceling an inaccessible/canceled event uses UPDATE, not INSERT policy upsert', async () => {
-    const maybeSingle = jest.fn<() => Promise<{ data: { status: string }; error: null }>>().mockResolvedValue({ data: { status: 'cancelled' }, error: null });
-    const query = { eq: jest.fn(), select: jest.fn(), maybeSingle };
-    query.eq.mockReturnValue(query); query.select.mockReturnValue(query);
-    const update = jest.fn().mockReturnValue(query), upsert = jest.fn();
-    const client = { from: jest.fn().mockReturnValue({ update, upsert }) } as unknown as SupabaseClient;
+  test('RSVP cancellation uses the authenticated serialized RPC without a client-supplied actor', async () => {
+    const rpc = jest.fn<(...args: unknown[]) => Promise<{ error: null }>>().mockResolvedValue({ error: null });
+    const client = { rpc } as unknown as SupabaseClient;
     await setRSVP(client, 'alice', '1', 'cancelled');
-    expect(update).toHaveBeenCalledWith({ status: 'cancelled' }); expect(upsert).not.toHaveBeenCalled();
-    expect(query.eq).toHaveBeenCalledWith('user_id','alice'); expect(query.eq).toHaveBeenCalledWith('event_id','1');
+    expect(rpc).toHaveBeenCalledWith('set_event_rsvp', { p_event: '1', p_status: 'cancelled' });
   });
   test('ranking excludes attendance/cancellation and keeps compatibility ahead of interests', () => {
     const compatible = { ...base, id: 'compatible', category: 'Arts', pulse_starts_at: '2026-10-26T16:00Z', pulse_ends_at: '2026-10-26T17:00Z' };

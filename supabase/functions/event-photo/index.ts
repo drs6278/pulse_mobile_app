@@ -22,8 +22,9 @@ Deno.serve(async request => {
   try {
     // Read as the caller, so event visibility rules apply before any work.
     const { data: event, error: eventError } = await auth.client.from('events').select('id::text,created_by,pulse_cancelled').eq('id', eventId).maybeSingle();
-    if (eventError || !event || event.created_by !== auth.user.id || event.pulse_cancelled) {
-      return respond({ error: 'Only the original poster can add a photo to this event.' }, 403);
+    const permission = event ? await auth.client.rpc('community_can_edit_event', { p_event: event.id }) : null;
+    if (eventError || !event || permission?.error || !permission?.data || event.pulse_cancelled) {
+      return respond({ error: 'Only an authorized event organizer can add a photo to this event.' }, 403);
     }
     const bytes = await readLimitedBody(request, MAX_IMAGE_BYTES);
     imageDimensions(bytes);

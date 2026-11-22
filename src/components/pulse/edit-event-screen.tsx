@@ -8,6 +8,7 @@ import { useEventPermission } from '@/hooks/use-event-permission';
 import { fetchEventById, type PulseEvent } from '@/lib/event-query';
 import { pickEventPhoto, removeEventPhoto, uploadEventPhoto, type PickedEventPhoto } from '@/lib/event-photo';
 import { EventPhotoField } from './event-photo-field';
+import { ClubEventVisibility } from './club-event-visibility';
 import { profileSessionClient } from '@/lib/profile/repository';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
@@ -112,6 +113,7 @@ function Editor({ event }: { event: PulseEvent }) {
     {!allowed && <Message text="Only the original poster can edit an event, and only before it starts." error />}
     {allowed && <EventPhotoField uri={pendingPhoto ?? undefined} path={photoPath} busy={photoBusy} error={photoError} onChoose={() => void changePhoto('pick')} onRemove={() => void changePhoto('remove')} />}
     <EventFormFields draft={draft} busy={busy || !allowed} change={values => { setDraft(previous => ({ ...previous, ...values })); setError(null); }} />
-    <PulseText variant="caption" tone="muted">Saving updates the event immediately and notifies Going attendees. Existing RSVPs are kept.</PulseText>
+    {event.club_id && <ClubEventVisibility value={draft.visibility} disabled={busy || !allowed} onChange={visibility => setDraft(previous => ({ ...previous, visibility }))} />}
+    <PulseText variant="caption" tone="muted">Saving updates the event immediately and notifies Going attendees. Switching to club-only cancels nonmember RSVPs.</PulseText>
   </EditFrame>;
 }

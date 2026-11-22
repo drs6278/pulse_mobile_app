@@ -14,15 +14,7 @@ export async function loadRSVPs(client: SupabaseClient, userId: string, signal?:
   }
   throw new Error('Too many RSVPs to calculate availability reliably.');
 }
-export async function setRSVP(client: SupabaseClient, userId: string, eventId: string, status: RSVP['status']) {
-  if (status === 'cancelled') {
-    // Upsert also evaluates INSERT policies. A canceled/hidden event must remain
-    // cancellable even when its policy no longer allows a fresh RSVP.
-    const { data, error } = await client.from('event_rsvps').update({ status }).eq('user_id', userId).eq('event_id', eventId).select('status').maybeSingle();
-    if (error) throw error;
-    if (!data) throw new Error('This RSVP is no longer available. Refresh your calendar.');
-    return;
-  }
-  const { error } = await client.from('event_rsvps').upsert({ user_id: userId, event_id: eventId, status }, { onConflict: 'user_id,event_id' });
+export async function setRSVP(client: SupabaseClient, _userId: string, eventId: string, status: RSVP['status']) {
+  const { error } = await client.rpc('set_event_rsvp', { p_event: eventId, p_status: status });
   if (error) throw error;
 }

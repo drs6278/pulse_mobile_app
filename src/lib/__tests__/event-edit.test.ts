@@ -17,3 +17,9 @@ test('editor uses the original timezone and all form values', () => {
 test('notification summaries show readable old and new field values', () => {
   expect(notificationChanges({ id: 'n', event_id: '1', event_title: 'Game', created_at: '', read_at: null, changes: { title: { before: 'Game', after: 'New game' }, pulse_age_min: { before: 0, after: 21 } } })).toEqual(['Title: Game → New game', 'Age restriction: All ages → 21+']);
 });
+
+test('club editor retains visibility so ordinary edits never publish a members-only event', () => {
+  expect(eventDraft({ ...event, club_id: 'club', pulse_visibility: 'club_only' }).visibility).toBe('club_only');
+  expect(eventDraft({ ...event, club_id: 'club' }).visibility).toBe('public');
+  expect(eventDraft(event).visibility).toBeUndefined();
+});

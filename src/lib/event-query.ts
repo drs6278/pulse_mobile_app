@@ -3,6 +3,7 @@ import { DateTime } from 'luxon';
 
 export type PulseEvent = {
   club_id?: string | null;
+  pulse_visibility?: 'public' | 'club_only';
   id: string;
   title: string;
   event_date: string;
@@ -30,7 +31,7 @@ export const missingColumn = (error: { code?: string } | null) => ['42703', 'PGR
 // Loads one event with as much detail as the server supports. `allowBasic`
 // accepts servers without scheduling columns, for read-only screens.
 export async function fetchEventById(client: SupabaseClient, id: string, signal: AbortSignal, { allowBasic = false } = {}) {
-  const attempts = [`${eventDetailsColumns},${eventPhotoColumn}`, eventDetailsColumns, ...(allowBasic ? [eventColumns] : [])];
+  const attempts = [`${eventDetailsColumns},${eventPhotoColumn},pulse_visibility`, `${eventDetailsColumns},${eventPhotoColumn}`, eventDetailsColumns, ...(allowBasic ? [eventColumns] : [])];
   for (const [index, columns] of attempts.entries()) {
     const { data, error } = await client.from('events').select(columns).eq('id', id).abortSignal(signal).maybeSingle<PulseEvent>();
     if (!error) return data;

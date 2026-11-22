@@ -13,6 +13,7 @@ export function eventDraft(event: PulseEvent): EventDraft {
   const interval = eventInterval(event);
   if (!interval) throw new Error('This event has no verified start and end time.');
   return { title: event.title, location: event.location,
+    ...(event.club_id ? { visibility: event.pulse_visibility ?? 'public' } : {}),
     category: eventCategories.find(category => category === event.category) ?? 'Other', timezone,
     start_local: DateTime.fromMillis(interval.start, { zone: timezone }).toFormat("yyyy-MM-dd'T'HH:mm:ss"),
     end_local: DateTime.fromMillis(interval.end, { zone: timezone }).toFormat("yyyy-MM-dd'T'HH:mm:ss"),
