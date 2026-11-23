@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 
 import { PulseColors as C } from '@/constants/pulse-theme';
-import { dateOptions, defaultEventFilters, eventCategories, validateEventFilters, type EventFilters } from '@/lib/event-filters';
+import { dateOptions, defaultEventFilters, eventCategories, eventSortLabels, eventSorts, validateEventFilters, type EventFilters } from '@/lib/event-filters';
 import { EVENTS_PER_PAGE } from '@/lib/event-query';
 import { useEvents } from '@/providers/events-provider';
 import { useSavedEvents } from '@/providers/saved-events-provider';
@@ -43,10 +43,10 @@ export function EventFeed() {
   </View>;
 }
 
-export function FilterGroup<T extends string>({ title, options, value, onChange }: { title: string; options: readonly T[]; value: T; onChange: (value: T) => void }) {
+export function FilterGroup<T extends string>({ title, options, value, onChange, formatLabel = String }: { title: string; options: readonly T[]; value: T; onChange: (value: T) => void; formatLabel?: (option: T) => string }) {
   const s = usePulseScale();
   return <View style={{ gap: 12 * s }}><PulseText size={32}>{title}</PulseText><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 * s }}>
-    {options.map(option => <Pressable key={option} accessibilityRole="radio" accessibilityLabel={`${title}: ${option}`} accessibilityState={{ checked: value === option }} onPress={() => onChange(option)} style={{ minHeight: 44, minWidth: 80 * s, paddingHorizontal: 14 * s, paddingVertical: 10 * s, borderRadius: 25 * s, borderWidth: 2, borderColor: value === option ? C.pink : C.muted, backgroundColor: value === option ? C.pink : 'transparent', alignItems: 'center', justifyContent: 'center' }}><PulseText size={14} color={value === option ? C.white : C.muted}>{option}</PulseText></Pressable>)}
+    {options.map(option => <Pressable key={option} accessibilityRole="radio" accessibilityLabel={`${title}: ${formatLabel(option)}`} accessibilityState={{ checked: value === option }} onPress={() => onChange(option)} style={{ minHeight: 44, minWidth: 80 * s, paddingHorizontal: 14 * s, paddingVertical: 10 * s, borderRadius: 25 * s, borderWidth: 2, borderColor: value === option ? C.pink : C.muted, backgroundColor: value === option ? C.pink : 'transparent', alignItems: 'center', justifyContent: 'center' }}><PulseText size={14} color={value === option ? C.white : C.muted}>{formatLabel(option)}</PulseText></Pressable>)}
   </View></View>;
 }
 
@@ -74,7 +74,7 @@ export function EventFiltersScreen() {
   }
   return <Screen header={<TitleHeader title="Filter & sort" close right={<TextButton label="Reset" onPress={() => { setDraft({ ...defaultEventFilters }); setError(null); }} />} />} action="Show Results" onAction={apply}>
     <View style={{ padding: 16, gap: 32 }}>
-      <FilterGroup title="Sort" options={['date', 'top'] as const} value={draft.sort ?? 'top'} onChange={sort => update({ sort })} />
+      <FilterGroup title="Sort" options={eventSorts} formatLabel={sort => eventSortLabels[sort]} value={draft.sort ?? 'top'} onChange={sort => update({ sort })} />
       <CategoryFilterGroup selected={draft.categories} onToggle={category => update({ categories: category === null ? [] : draft.categories.includes(category) ? draft.categories.filter(item => item !== category) : [...draft.categories, category] })} />
       <FilterGroup title="Date" options={dateOptions} value={draft.date} onChange={date => update({ date })} />
       {draft.date === 'Pick Date' && <View style={{ gap: 8 }}><PulseText size={14}>Date (YYYY-MM-DD)</PulseText><TextInput accessibilityLabel="Event date, YYYY-MM-DD" value={draft.customDate} onChangeText={customDate => update({ customDate })} placeholder="YYYY-MM-DD" placeholderTextColor={C.muted} maxLength={10} autoCorrect={false} style={{ minHeight: 48, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: C.muted, color: C.white, fontSize: 16 }} /></View>}

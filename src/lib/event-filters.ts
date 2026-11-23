@@ -1,7 +1,10 @@
 export const eventCategories = ['Food', 'Music', 'Sports', 'Arts', 'Outdoors', 'Other'] as const;
 export const dateOptions = ['Upcoming', 'Today', 'Tomorrow', 'This Week', 'This Weekend', 'Pick Date'] as const;
+export const eventSorts = ['top', 'going', 'date'] as const;
+export type EventSort = typeof eventSorts[number];
+export const eventSortLabels: Record<EventSort, string> = { top: 'Top voted', going: 'Most going', date: 'Soonest' };
 export type EventFilters = {
-  sort?: 'date' | 'top';
+  sort?: EventSort;
   categories: typeof eventCategories[number][];
   date: typeof dateOptions[number];
   customDate: string;

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
+import type { EventSort } from './event-filters';
 
 export type PulseEvent = {
   club_id?: string | null;
@@ -69,7 +70,10 @@ export async function fetchCalendarCandidates(client: SupabaseClient, start: str
 
 type EventSearch = { categories: string[]; start: string; end: string | null; title: string };
 
-export async function fetchEvents(client: SupabaseClient, search: EventSearch, page: number, signal: AbortSignal, top = false) {
+// Ranked sorts run server-side; each RPC applies the same filters as the date query below.
+const rankedSorts = { top: 'list_top_events', going: 'list_most_attended_events' } as const;
+
+export async function fetchEvents(client: SupabaseClient, search: EventSearch, page: number, signal: AbortSignal, sort: EventSort = 'date') {
   const first = page * EVENTS_PER_PAGE;
   const run = (columns: string) => {
     let query = client.from('events').select(columns, { count: 'exact' })
@@ -84,8 +88,8 @@ export async function fetchEvents(client: SupabaseClient, search: EventSearch, p
   if (response.error && missingColumn(response.error)) response = await run(eventColumns);
   const { data, error, count } = response;
   if (error) throw error;
-  if (top) {
-    const ranked = await client.rpc('list_top_events', { p_start: search.start, p_end: search.end, p_categories: search.categories, p_title: search.title, p_offset: first }).abortSignal(signal);
+  if (sort !== 'date') {
+    const ranked = await client.rpc(rankedSorts[sort], { p_start: search.start, p_end: search.end, p_categories: search.categories, p_title: search.title, p_offset: first }).abortSignal(signal);
     if (ranked.error) throw ranked.error;
     return { events: (ranked.data ?? []) as PulseEvent[], count: count ?? 0 };
   }

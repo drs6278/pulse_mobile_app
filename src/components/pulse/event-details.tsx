@@ -7,8 +7,10 @@ import { useEventPermission } from '@/hooks/use-event-permission';
 import { communityRpc, summaries, type Engagement } from '@/lib/community';
 import { fetchEventById, type PulseEvent } from '@/lib/event-query';
 import { eventWhen } from '@/lib/event-time';
+import { goingCount } from '@/lib/rsvp-repository';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
+import { useRSVPs } from '@/providers/rsvp-provider';
 import { EventDiscussion, useVote } from './community';
 import { CommentCountPill } from './event-card';
 import { ClubInvitations, ClubRestrictions, ClubToolsPanel, EventFeedback, EventReviews, OrganizerComposer } from './club-tools';
@@ -65,7 +67,7 @@ export function SupabaseEventScreen({ id, photoError }: { id: string; photoError
             <PulseText variant="display" accessibilityRole="header">{event.title}</PulseText>
           </View>
           <EventEngagement eventId={event.id} version={`${revision}:${commentVersion}`} />
-          <EventInfoCard event={event} />
+          <EventInfoCard event={event} revision={revision} />
           {session && <View key={session.user.id + ':' + event.id} style={{ gap: 8 }}>
             <ClubToolsPanel label="Event reviews"><EventReviews event={event.id} /></ClubToolsPanel>
             <ClubToolsPanel label="Private feedback"><EventFeedback event={event.id} /></ClubToolsPanel>
@@ -112,15 +114,34 @@ const fitDetail = {
   unknown: { text: 'Couldn’t check your schedule', tone: 'muted' },
 } as const satisfies Record<string, { text: string; tone: PulseTextTone }>;
 
-function EventInfoCard({ event }: { event: PulseEvent }) {
+function EventInfoCard({ event, revision }: { event: PulseEvent; revision: number }) {
   const when = eventWhen(event);
   const fit = useScheduleFit(event);
   const fitLine = fit && !event.pulse_cancelled ? fitDetail[fit] : null;
   return <InfoCard>
     <InfoRow icon="date" title={when.date} detail={when.time} extra={fitLine} />
     <InfoRow icon="pin" title={event.location} />
+    <AttendanceRow event={event} revision={revision} />
     {event.club_id && <InfoRow icon="people" title="Hosting club" href={{ pathname: '/clubs', params: { id: event.club_id } }} />}
     {event.created_by && <InfoRow icon="account" title="Organizer profile" href={{ pathname: '/student-profile', params: { id: event.created_by } }} />}
     {!!event.pulse_age_min && <InfoRow icon="info" title={`${event.pulse_age_min}+`} detail="Self-reported age eligibility required" />}
   </InfoCard>;
+}
+
+// Refetched on page refresh and whenever your own RSVP changes, so tapping "I'm going" updates it.
+function AttendanceRow({ event, revision }: { event: PulseEvent; revision: number }) {
+  const rsvps = useRSVPs();
+  const going = rsvps.data?.find(item => String(item.event_id) === String(event.id))?.status === 'going';
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    // A failed count just hides the row; the rest of the page still works.
+    goingCount(supabase, String(event.id), controller.signal).then(value => value, () => null).then(value => { if (!controller.signal.aborted) setCount(value); });
+    return () => controller.abort();
+  }, [event.id, going, revision]);
+  if (count === null) return null;
+  const others = Math.max(0, count - (going ? 1 : 0));
+  const title = count === 0 ? 'No one going yet' : `${count} going`;
+  const detail = going ? (others ? `You and ${others} ${others === 1 ? 'other' : 'others'}` : 'Just you so far') : count === 0 && !event.pulse_cancelled ? 'Be the first to RSVP' : null;
+  return <InfoRow icon="attendees" title={title} detail={detail} />;
 }

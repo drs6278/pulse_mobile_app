@@ -6,6 +6,7 @@ import { PulseColors as C } from '@/constants/pulse-theme';
 // The only place expo-symbols is used: the library is still in beta.
 const symbols = {
   account: ['person.crop.circle', 'account_circle'],
+  attendees: ['person.3', 'groups'],
   add: ['plus.circle', 'add_circle'],
   back: ['chevron.left', 'arrow_back'],
   bell: ['bell', 'notifications'],
