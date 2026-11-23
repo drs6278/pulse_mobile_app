@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 
 export type PulseEvent = {
   club_id?: string | null;
-  pulse_visibility?: 'public' | 'club_only';
+  pulse_visibility?: 'public' | 'club_only' | 'private';
   id: string;
   title: string;
   event_date: string;

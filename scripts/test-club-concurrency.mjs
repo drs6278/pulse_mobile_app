@@ -70,6 +70,16 @@ if (!process.env.PULSE_CLUB_TEST_DATABASE_URL) {
     const narrowing = await hold(`begin; set local role authenticated; select set_config('request.jwt.claim.sub','${admin}',true); select public.edit_pulse_event('${finalEvent}',1,'${draft}'); select 'PRIVATE_READY'; select pg_sleep(2); commit;`, 'PRIVATE_READY');
     await assert.rejects(query(as(charlie, `select public.set_event_rsvp('${finalEvent}','going')`)), /unavailable/);
     await narrowing.completion;
+    await query(as(charlie, `select public.manage_club_member('${club}','join')`));
+    const inviteDraft = draft.replace('club_only','private');
+    const inviteEvent = (await query(as(admin, `select public.create_club_event('${club}','${inviteDraft}')`))).split('\n').at(-1);
+    await query(as(admin, `select public.manage_club_invitation('${inviteEvent}','${charlie}',true)`));
+    const revoking = await hold(`begin; set local role authenticated; select set_config('request.jwt.claim.sub','${admin}',true); select public.manage_club_invitation('${inviteEvent}','${charlie}',false); select 'REVOKED'; select pg_sleep(2); commit;`, 'REVOKED');
+    await assert.rejects(query(as(charlie, `select public.set_event_rsvp('${inviteEvent}','going')`)), /unavailable/);
+    await revoking.completion;
+    const restricting = await hold(`begin; set local role authenticated; select set_config('request.jwt.claim.sub','${admin}',true); select public.set_club_restriction('${club}','${charlie}','rsvp'); select 'RESTRICTED'; select pg_sleep(2); commit;`, 'RESTRICTED');
+    await assert.rejects(query(as(charlie, `select public.set_event_rsvp('${anotherEvent}','going')`)), /unavailable/);
+    await restricting.completion;
     console.log('PASS independent PostgreSQL sessions: RSVP versus departure, both visibility race orderings, and concurrent last-admin departure.');
   } finally {
     if (club) await query(`delete from public.events where club_id='${club}'; delete from public.clubs where id='${club}';`);

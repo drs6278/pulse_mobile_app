@@ -80,3 +80,15 @@ test('admin role changes require confirmation and use the dedicated role RPC', a
   await waitFor(() => expect(mockRpc).toHaveBeenCalledWith('set_club_member_role', { p_club: 'club', p_user: 'bob', p_role: 'officer' }));
   expect(mockRefresh).toHaveBeenCalled();
 });
+
+test('admins can open restrictions and use the RSVP-only action for a member', async () => {
+  mockData.own = member('admin');
+  mockData.members = [{ ...member('member'), user_id: 'bob', display_name: 'Bob' }];
+  mockRpc.mockImplementation(async name => name === 'find_club_restriction_targets' ? [] : undefined);
+  const screen = await render(<ClubsScreen />);
+  await fireEvent.press(screen.getByRole('button', { name: 'Event restrictions' }));
+  await waitFor(() => expect(mockRpc).toHaveBeenCalledWith('find_club_restriction_targets', { p_club: 'club', p_name: '' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Restrict RSVPs' }).props.accessibilityState.disabled).toBe(false));
+  await fireEvent.press(screen.getByRole('button', { name: 'Restrict RSVPs' }));
+  await waitFor(() => expect(mockRpc).toHaveBeenCalledWith('set_club_restriction', { p_club: 'club', p_user: 'bob', p_kind: 'rsvp' }));
+});

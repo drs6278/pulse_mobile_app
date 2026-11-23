@@ -90,3 +90,17 @@ admin departure. It skips explicitly when no test URL is supplied. Never point
 it at production. Live device interactions, hosted schema compatibility, Edge
 Function deployment, and independent PostgreSQL concurrency require separate
 environment validation.
+
+## Club invitations, restrictions, and community tools
+
+The linked backend has migrations `202611220001_club_access.sql` and
+`202611220002_club_community.sql`. In the updated development app, open a club
+profile for reviews, reports, announcements, and admin restrictions. Open an
+invite-only event as a manager to add or revoke invitations. Event details also
+contain reviews, private feedback, attendee messaging, and admin attendee
+restrictions. Recipients manage organizer messages and mutes in Notifications.
+
+The community database suite includes invitation enforcement, restriction
+behavior, review eligibility, private feedback isolation, and muted and retried
+announcements. The independent-session script also covers invitation and
+restriction races when run against a disposable PostgreSQL database.

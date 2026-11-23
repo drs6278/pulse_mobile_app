@@ -19,7 +19,7 @@ try {
  create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
  create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text references storage.buckets(id),name text,created_at timestamptz default now(),unique(bucket_id,name));
  alter table storage.objects enable row level security; grant select,insert,delete on storage.objects to authenticated;`);
- for (const name of ['202610190001_scheduling','202610210001_event_creation','202610210003_schedule_review','202610230001_profiles','202610230002_profile_setup','202610280001_event_edit_notifications','202610280002_community','202611020001_saved_events','202611080001_event_photos','202611130001_event_deletion','202611160001_club_officers','202611160002_club_visibility','202611160003_club_workflows']) {
+ for (const name of ['202610190001_scheduling','202610210001_event_creation','202610210003_schedule_review','202610230001_profiles','202610230002_profile_setup','202610280001_event_edit_notifications','202610280002_community','202611020001_saved_events','202611080001_event_photos','202611130001_event_deletion','202611160001_club_officers','202611160002_club_visibility','202611160003_club_workflows','202611220001_club_access','202611220002_club_community']) {
   await db.exec(await fs.readFile(new URL(`../supabase/migrations/${name}.sql`,import.meta.url),'utf8'));
  }
  await db.exec(`update public.private_profiles set profile_setup_completed_at=now(),age_band='21_plus'`);
@@ -188,6 +188,57 @@ try {
  assert.equal((await db.query('select role from public.club_memberships where club_id=$1 and user_id=$2',[secured,alice])).rows[0].role,'officer','ordinary account cleanup must not promote anyone');
  await db.query('select public.resolve_profile_clubs($1)',[bob]);
  assert.equal((await db.query('select role from public.club_memberships where club_id=$1 and user_id=$2',[secured,alice])).rows[0].role,'admin','officer succeeds departing final admin');
+ // Invite-only access, private feedback, role boundaries and recipient filtering.
+ await identity(alice);
+ await db.query('select public.manage_club_member($1,$2,$3)',[secured,bob,'approve']).catch(() => {});
+ await identity(bob);
+ await db.query('select public.manage_club_member($1,$2)',[secured,'join']);
+ await identity(alice);
+ await db.query('select public.manage_club_member($1,$2,$3)',[secured,'approve',bob]);
+ const inviteOnly=(await db.query('select public.create_club_event($1,$2::jsonb) as id',[
+   secured,JSON.stringify({...draft,pulse_visibility:'private'}),
+ ])).rows[0].id;
+ await identity(bob);
+ assert.equal((await db.query('select id from public.events where id=$1',[inviteOnly])).rows.length,0);
+ await assert.rejects(db.query('select public.manage_club_invitation($1,$2,true)',[inviteOnly,bob]),/manager required/);
+ await identity(alice);
+ await db.query('select public.manage_club_invitation($1,$2,true)',[inviteOnly,bob]);
+ const request='f0000000-0000-4000-8000-000000000001';
+ await db.query('select public.send_organizer_message($1,null,$2,$3)',[secured,request,'Club announcement']);
+ await db.query('select public.send_organizer_message($1,null,$2,$3)',[secured,request,'Retried announcement']);
+ await identity(bob);
+ assert.equal((await db.query('select id from public.events where id=$1',[inviteOnly])).rows.length,1);
+ await db.query('select public.set_event_rsvp($1,$2)',[inviteOnly,'going']);
+ await db.query('select public.send_event_feedback($1,$2)',[inviteOnly,'Private feedback']);
+ await db.query('select public.save_club_review($1,null,5,$2)',[secured,'Great club']);
+ await assert.rejects(db.query('select public.save_club_review(null,$1,5,$2)',[inviteOnly,'Too early']),/not eligible/);
+ assert.equal(Number((await db.query('select total from public.club_rating($1)',[secured])).rows[0].total),1);
+ assert.deepEqual((await db.query('select body from public.list_organizer_messages()')).rows,[{body:'Club announcement'}]);
+ await db.query('select public.set_organizer_mute($1,null,true)',[secured]);
+ assert.equal((await db.query('select * from public.list_organizer_messages()')).rows.length,0);
+ await db.query('select public.set_organizer_mute($1,null,false)',[secured]);
+ await db.query('select public.read_organizer_messages()');
+ assert.equal((await db.query('select * from public.list_organizer_messages(0,true)')).rows.length,0);
+ await db.query('select public.report_club($1,$2)',[secured,'Review this club']);
+ assert.equal((await db.query('select * from public.list_club_reports()')).rows.length,0);
+ await identity(charlie);
+ assert.equal((await db.query('select * from public.list_event_feedback($1)',[inviteOnly])).rows.length,0);
+ assert.equal((await db.query('select * from public.list_organizer_messages()')).rows.length,0);
+ await identity(alice);
+ assert.equal((await db.query('select body from public.list_event_feedback($1)',[inviteOnly])).rows[0].body,'Private feedback');
+ await db.query('select public.set_club_restriction($1,$2,$3)',[secured,bob,'rsvp']);
+ await identity(bob);
+ assert.equal((await db.query('select id from public.events where id=$1',[inviteOnly])).rows.length,1);
+ await assert.rejects(db.query('select public.set_event_rsvp($1,$2)',[inviteOnly,'going']),/unavailable/);
+ await identity(alice);
+ await db.query('select public.set_club_restriction($1,$2,$3)',[secured,bob,'visibility']);
+ await identity(bob);
+ assert.equal((await db.query('select id from public.events where id=$1',[inviteOnly])).rows.length,0);
+ await identity(alice);
+ await db.query('select public.set_club_restriction($1,$2,null)',[secured,bob]);
+ await db.query('select public.manage_club_invitation($1,$2,false)',[inviteOnly,bob]);
+ await identity(bob);
+ assert.equal((await db.query('select id from public.events where id=$1',[inviteOnly])).rows.length,0);
  // Restrictive visibility also composes with an existing anonymous public-read policy.
  await db.exec('reset role; grant select on public.events to anon; create policy anonymous_event_read on public.events for select to anon using(true);');
  await db.exec('set role anon');

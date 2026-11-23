@@ -17,7 +17,8 @@ export function NotificationsProvider({ children }: PropsWithChildren) {
     void (async () => {
       const { count, error } = await supabase.from('event_notifications').select('id', { count: 'exact', head: true }).eq('user_id', user).is('read_at', null).abortSignal(controller.signal);
       const discussion = await supabase.from('discussion_notifications').select('id', { count: 'exact', head: true }).eq('user_id', user).is('read_at', null).abortSignal(controller.signal);
-      if (active && !error) setResult({ user, count: (count ?? 0) + (discussion.count ?? 0) });
+      const organizer = await supabase.rpc('list_organizer_messages', { p_unread: true }).abortSignal(controller.signal);
+      if (active && !error) setResult({ user, count: (count ?? 0) + (discussion.count ?? 0) + Number(organizer.data?.[0]?.unread_count ?? 0) });
     })();
     return () => { active = false; controller.abort(); };
   }, [user, revision]);

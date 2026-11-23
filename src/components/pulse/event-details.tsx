@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/providers/auth-provider';
 import { EventDiscussion, useVote } from './community';
 import { CommentCountPill } from './event-card';
+import { ClubInvitations, ClubRestrictions, ClubToolsPanel, EventFeedback, EventReviews, OrganizerComposer } from './club-tools';
 import { DeleteEventButton } from './delete-event-button';
 import { EventActionBar, useScheduleFit } from './schedule/event-actions';
 import { EventPhoto } from './ui/event-photo';
@@ -65,6 +66,16 @@ export function SupabaseEventScreen({ id, photoError }: { id: string; photoError
           </View>
           <EventEngagement eventId={event.id} version={`${revision}:${commentVersion}`} />
           <EventInfoCard event={event} />
+          {session && <View key={session.user.id + ':' + event.id} style={{ gap: 8 }}>
+            <ClubToolsPanel label="Event reviews"><EventReviews event={event.id} /></ClubToolsPanel>
+            <ClubToolsPanel label="Private feedback"><EventFeedback event={event.id} /></ClubToolsPanel>
+            {!!event.club_id && canDelete && <ClubToolsPanel label="Attendee restrictions">
+              <ClubRestrictions club={event.club_id} event={event.id} />
+            </ClubToolsPanel>}
+            {allowed && <OrganizerComposer event={event.id} />}
+            {!!event.club_id && allowed && event.pulse_visibility === 'private' &&
+              <ClubToolsPanel label="Manage invitations"><ClubInvitations club={event.club_id} event={event.id} /></ClubToolsPanel>}
+          </View>}
           {canDelete && <DeleteEventButton key={`delete:${session?.user.id}:${event.id}:${event.pulse_revision}`} event={event} />}
           <EventDiscussion key={`discussion:${session?.user.id}:${event.id}:${revision}`} eventId={event.id} onCommentsChanged={() => setCommentVersion(value => value + 1)} />
           {menuOpen && <ActionSheet visible title="Event options" onClose={() => setMenuOpen(false)} actions={[

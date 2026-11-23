@@ -9,6 +9,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { useNotifications } from '@/providers/notifications-provider';
 import { Screen, TitleHeader, PulseText } from './ui';
 import { Button, Message } from './schedule/controls';
+import OrganizerInbox from './organizer-inbox';
 import DiscussionNotifications from './discussion-notifications';
 
 export default function NotificationsScreen() {
@@ -25,6 +26,7 @@ export default function NotificationsScreen() {
   const { refresh } = resource;
   const { refresh: refreshBadge } = badge;
   useFocusEffect(useCallback(() => { refresh(); refreshBadge(); }, [refresh, refreshBadge]));
+  const [inboxRevision, setInboxRevision] = useState(0);
   async function read(notification?: EventNotification) {
     if (busy) return;
     setBusy(true); setError(null);
@@ -37,6 +39,9 @@ export default function NotificationsScreen() {
         if (error) throw new Error('Unable to mark notifications as read. Please try again.');
         if (!notification) {
           const discussion = await client.from('discussion_notifications').update({ read_at: new Date().toISOString() }).eq('user_id', user).is('read_at', null);
+          const organizer = await client.rpc('read_organizer_messages');
+          if (organizer.error && organizer.error.code !== 'PGRST202') throw new Error('Unable to mark organizer messages as read.');
+          setInboxRevision(value => value + 1);
           if (discussion.error && discussion.error.code !== '42P01' && discussion.error.code !== 'PGRST205') throw new Error('Unable to mark discussion notifications as read.');
         }
       });
@@ -46,6 +51,7 @@ export default function NotificationsScreen() {
     finally { setBusy(false); }
   }
   return <Screen header={<TitleHeader title="Notifications" />}><View style={{ padding: 16, gap: 16 }}>
+    <OrganizerInbox key={inboxRevision} />
     <DiscussionNotifications />
     <Button label="Mark all as read" disabled={busy || !badge.unread} onPress={() => void read()} />
     <Button label="Refresh" disabled={busy} onPress={() => { resource.refresh(); badge.refresh(); }} />

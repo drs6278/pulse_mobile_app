@@ -14,6 +14,7 @@ import { EventFormFields } from './event-form';
 import { ClubEventVisibility } from './club-event-visibility';
 import { Screen, TitleHeader } from './ui';
 import { ProfileButton, ProfileField, ProfileLink, ProfileMessage, ProfileText } from './profile/controls';
+import { ClubRestrictions, ClubReviews, ClubTextAction, ClubToolsPanel, OrganizerComposer } from './club-tools';
 import { VoteButtons } from './community';
 
 export default function ClubsScreen() {
@@ -88,6 +89,12 @@ function ClubSession({ id }: { id?: string }) {
         <ProfileText>Contact: {club.contact || 'Not provided'}</ProfileText><ProfileText>Website: {club.website || 'Not provided'}</ProfileText><ProfileText>Meeting location: {club.meeting_location || 'Not provided'}</ProfileText>
         {!club.deleted_at && <>
           {own ? <><ProfileText>Your membership: {own.role} · {own.status}</ProfileText><ProfileButton label={own.status === 'pending' ? 'Cancel join request' : 'Leave club'} disabled={busy} onPress={() => own.status === 'pending' ? void run(() => membership(club.id, 'leave')) : confirm('Leave this club? Your RSVPs for its club-only events will be cancelled. Public event RSVPs are kept. The last admin must appoint another admin first.', 'Confirm leave club', () => membership(club.id, 'leave'))} /></> : <ProfileButton label={club.approval_required ? 'Request to join' : 'Join club'} disabled={busy} onPress={() => void run(() => membership(club.id, 'join'))} />}
+          <ClubToolsPanel label="Ratings and reviews"><ClubReviews club={club.id} canReview={own?.status === 'active'} /></ClubToolsPanel>
+          <ClubToolsPanel label="Report club"><ClubTextAction label="Reason for reporting" limit={1000} submit={body => communityRpc('report_club', { p_club: club.id, p_reason: body })} /></ClubToolsPanel>
+          {admin && <>
+            <OrganizerComposer club={club.id} />
+            <ClubToolsPanel label="Event restrictions"><ClubRestrictions club={club.id} members={data.members} /></ClubToolsPanel>
+          </>}
           {manager && <ProfileButton label="Create club event" disabled={busy} onPress={() => setEventDraft({ ...defaultEventDraft(), visibility: 'public' })} />}
           {admin && <ProfileButton label="Edit club" disabled={busy} onPress={() => { setDraft(club); setEditing(club.id); }} />}
           {own?.status === 'active' && <><ProfileText title>Members</ProfileText>
